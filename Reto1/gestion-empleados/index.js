@@ -27,10 +27,9 @@ function errorResponse(res, { status, message, path, errors = [] }) {
 
 // Registrar empleado (POST)
 app.post('/empleado', async (req, res) => {
-    const { id, nombre, apellido, cargo, email } = req.body;
-
+    const { nombre, apellido, cargo, email } = req.body;
     // Validación de campos requeridos
-    const camposRequeridos = { id, nombre, apellido, cargo, email };
+    const camposRequeridos = { nombre, apellido, cargo, email };
     const faltantes = Object.entries(camposRequeridos)
         .filter(([, v]) => v === undefined || v === null || v === '')
         .map(([field]) => ({
@@ -50,10 +49,11 @@ app.post('/empleado', async (req, res) => {
 
     try {
         const nuevo = await prisma.empleado.create({
-            data: { id: parseInt(id), nombre, apellido, cargo, email },
+            data: {nombre, apellido, cargo, email },
         });
         res.status(201).json(nuevo);
     } catch (error) {
+        console.error("ERROR REAL:", error);  
         if (error.code === 'P2002') {
             return errorResponse(res, {
                 status: 409,

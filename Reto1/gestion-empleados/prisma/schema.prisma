@@ -8,7 +8,7 @@ datasource db {
 }
 
 model Empleado {
-  id     Int    @id
+  id       Int    @id @default(autoincrement())  
   nombre String
   apellido String
   cargo  String
