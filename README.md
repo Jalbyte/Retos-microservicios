@@ -104,22 +104,18 @@ flowchart LR
     subgraph Cliente
         A[Cliente / Navegador]
     end
-
     subgraph Docker Network
         subgraph Servicio_Empleados
-            B[API Empleados\nNode.js + Express]
-            C[(PostgreSQL\nDB Empleados)]
+            B[API Empleados<br>Node.js + Express]
+            C[(PostgreSQL<br>DB Empleados)]
         end
-
         subgraph Servicio_Departamentos
-            D[API Departamentos\nGo + Gin]
-            E[(PostgreSQL\nDB Departamentos)]
+            D[API Departamentos<br>Go + Gin]
+            E[(PostgreSQL<br>DB Departamentos)]
         end
     end
-
     A -->|HTTP :8080| B
     A -->|HTTP :8081| D
-
     B -->|Validación HTTP| D
     B -->|SQL| C
     D -->|SQL| E
