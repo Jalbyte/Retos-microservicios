@@ -98,24 +98,4 @@ El servicio de empleados:
 
 Esto asegura integridad lógica sin compartir base de datos.     
 
-## **Diagrama de Arquitectura**
 
-flowchart LR
-    subgraph Cliente
-        A[Cliente / Navegador]
-    end
-    subgraph Docker Network
-        subgraph Servicio_Empleados
-            B[API Empleados<br>Node.js + Express]
-            C[(PostgreSQL<br>DB Empleados)]
-        end
-        subgraph Servicio_Departamentos
-            D[API Departamentos<br>Go + Gin]
-            E[(PostgreSQL<br>DB Departamentos)]
-        end
-    end
-    A -->|HTTP :8080| B
-    A -->|HTTP :8081| D
-    B -->|Validación HTTP| D
-    B -->|SQL| C
-    D -->|SQL| E
