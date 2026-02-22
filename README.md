@@ -1,22 +1,24 @@
-# **Retos Microservicios**
+# **Sistema de Microservicios**
 
-Proyecto compuesto por dos microservicios independientes con bases de datos separadas:
+Este proyecto implementa una arquitectura basada en microservicios desacoplados, donde cada servicio:
 
-### **Reto 1 – Gestión de Empleados**
+- Tiene su propia base de datos
+- Se despliega en contenedores independientes
+- Se comunica vía HTTP
+- Mantiene aislamiento de responsabilidades
 
-* Node.js + Express
-* Prisma ORM
-* PostgreSQL
+## **Arquitectura General**
 
-### **Reto 2 – Gestión de Departamentos**
+El sistema está compuesto por:
 
-* Go + Gin
-* PostgreSQL
+* Servicio de Empleados
+* Servicio de Departamentos
+* Dos bases de datos PostgreSQL independientes
 
-Cada servicio tiene su propia base de datos, cumpliendo el principio de aislamiento de microservicios.
+Cada microservicio expone su propia API REST y documentación Swagger.
 
 
-## **Cómo desplegar TODO el proyecto**
+## **🐳 Despliegue Completo del Sistema**
 
 Desde la raíz del proyecto ejecutar: 
 
@@ -24,6 +26,24 @@ Desde la raíz del proyecto ejecutar:
 ```Docker 
 docker compose up --build -d
 ```
+
+Esto levantará:
+
+* Contenedor (Servicio) de empleados
+* Base de datos empleados
+* Contenedor (Servicio) de departamentos
+* Base de datos departamentos
+
+## **Orden de Inicialización**
+
+El orden correcto de despliegue es:
+
+1. Bases de datos
+2. Servicio de Departamentos
+3. Servicio de Empleados
+
+Docker Compose gestiona automáticamente la red interna entre servicios.
+
 
 ## **Migraciones (Solo Empleados – Prisma)**
 
@@ -58,3 +78,48 @@ CREATE TABLE "Departamento" (
     descripcion TEXT
 );
 ```
+## **Acceso a los Servicios**
+
+Una vez levantado el sistema:
+
+| Servicio              | URL                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------ |
+| Empleados API         | [http://localhost:8080](http://localhost:8080)                                       |
+| Empleados Swagger     | [http://localhost:8080/docs](http://localhost:8080/docs)                             |
+| Departamentos API     | [http://localhost:8081](http://localhost:8081)                                       |
+| Departamentos Swagger | [http://localhost:8081/swagger/index.html](http://localhost:8081/swagger/index.html) |
+
+## **Comunicación Entre Servicios**
+
+El servicio de empleados:
+
+* Consulta al servicio de departamentos antes de registrar un empleado.
+* Si el departamento no existe, rechaza la operación.
+
+Esto asegura integridad lógica sin compartir base de datos.     
+
+## **Diagrama de Arquitectura**
+
+flowchart LR
+    subgraph Cliente
+        A[Cliente / Navegador]
+    end
+
+    subgraph Docker Network
+        subgraph Servicio_Empleados
+            B[API Empleados\nNode.js + Express]
+            C[(PostgreSQL\nDB Empleados)]
+        end
+
+        subgraph Servicio_Departamentos
+            D[API Departamentos\nGo + Gin]
+            E[(PostgreSQL\nDB Departamentos)]
+        end
+    end
+
+    A -->|HTTP :8080| B
+    A -->|HTTP :8081| D
+
+    B -->|Validación HTTP| D
+    B -->|SQL| C
+    D -->|SQL| E
