@@ -1,5 +1,12 @@
 package main
 
+// @title API Gestión de Departamentos
+// @version 1.0
+// @description Microservicio para la gestión de departamentos
+// @host localhost:8081
+// @schemes http
+// @BasePath /
+
 import (
 	"database/sql"
 	"math"
@@ -8,9 +15,15 @@ import (
 	"strconv"
 	"time"
 
+	_ "gestion-departamentos/docs"
+
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
+
+var db *sql.DB
 
 type Departamento struct {
 	ID          string `json:"id"`
@@ -22,6 +35,18 @@ type ErrorDetail struct {
 	Field         string      `json:"field"`
 	Message       string      `json:"message"`
 	RejectedValue interface{} `json:"rejectedValue"`
+}
+
+type Pagination struct {
+	Page          int `json:"page"`
+	Size          int `json:"size"`
+	TotalElements int `json:"totalElements"`
+	TotalPages    int `json:"totalPages"`
+}
+
+type PaginatedResponse struct {
+	Data       []Departamento `json:"data"`
+	Pagination Pagination     `json:"pagination"`
 }
 
 type ErrorResponse struct {
@@ -52,13 +77,18 @@ func errorResponse(c *gin.Context, status int, message string, errors []ErrorDet
 }
 
 func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8081"
+	}
 
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		panic("DATABASE_URL no está definida")
 	}
 
-	db, err := sql.Open("postgres", dbURL)
+	var err error
+	db, err = sql.Open("postgres", dbURL)
 	if err != nil {
 		panic(err)
 	}
@@ -66,127 +96,169 @@ func main() {
 
 	r := gin.Default()
 
-	// POST /departamentos
-	r.POST("/departamentos", func(c *gin.Context) {
-		var dept Departamento
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
+		ginSwagger.URL("/swagger/doc.json"),
+	))
+	r.POST("/departamentos", CreateDepartamento)
+	r.GET("/departamentos", GetDepartamentos)
+	r.GET("/departamentos/:id", GetDepartamentoByID)
 
-		if err := c.ShouldBindJSON(&dept); err != nil {
-			errorResponse(c, 400, "JSON inválido", nil)
-			return
-		}
+	r.Run(":" + port)
+}
 
-		var errors []ErrorDetail
+//
+// ========================= HANDLERS =========================
+//
 
-		if dept.ID == "" {
-			errors = append(errors, ErrorDetail{"id", "El id es requerido", dept.ID})
-		}
-		if dept.Nombre == "" {
-			errors = append(errors, ErrorDetail{"nombre", "El nombre es requerido", dept.Nombre})
-		}
-		if dept.Descripcion == "" {
-			errors = append(errors, ErrorDetail{"descripcion", "La descripción es requerida", dept.Descripcion})
-		}
+// CreateDepartamento godoc
+// @Summary Crear departamento
+// @Description Registra un nuevo departamento
+// @Tags Departamentos
+// @Accept json
+// @Produce json
+// @Param departamento body Departamento true "Departamento"
+// @Success 201 {object} Departamento
+// @Failure 400 {object} ErrorResponse
+// @Failure 409 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /departamentos [post]
+func CreateDepartamento(c *gin.Context) {
+	var dept Departamento
 
-		if len(errors) > 0 {
-			errorResponse(c, 400, "Validation failed", errors)
-			return
-		}
+	if err := c.ShouldBindJSON(&dept); err != nil {
+		errorResponse(c, 400, "JSON inválido", nil)
+		return
+	}
 
-		_, err := db.Exec(
-			`INSERT INTO "Departamento" (id, nombre, descripcion) VALUES ($1, $2, $3)`,
-			dept.ID, dept.Nombre, dept.Descripcion,
-		)
+	var errors []ErrorDetail
 
-		if err != nil {
-			errorResponse(c, 409, "El departamento ya existe", []ErrorDetail{
-				{"id", "El id ya está registrado", dept.ID},
-			})
-			return
-		}
+	if dept.ID == "" {
+		errors = append(errors, ErrorDetail{"id", "El id es requerido", dept.ID})
+	}
+	if dept.Nombre == "" {
+		errors = append(errors, ErrorDetail{"nombre", "El nombre es requerido", dept.Nombre})
+	}
+	if dept.Descripcion == "" {
+		errors = append(errors, ErrorDetail{"descripcion", "La descripción es requerida", dept.Descripcion})
+	}
 
-		c.JSON(http.StatusCreated, dept)
-	})
+	if len(errors) > 0 {
+		errorResponse(c, 400, "Validation failed", errors)
+		return
+	}
 
-	// GET /departamentos con paginación
-	r.GET("/departamentos", func(c *gin.Context) {
+	_, err := db.Exec(
+		`INSERT INTO "Departamento" (id, nombre, descripcion) VALUES ($1, $2, $3)`,
+		dept.ID, dept.Nombre, dept.Descripcion,
+	)
 
-		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
-		size, _ := strconv.Atoi(c.DefaultQuery("size", "5"))
-
-		if page < 1 {
-			page = 1
-		}
-		if size < 1 {
-			size = 5
-		}
-		if size > 100 {
-			size = 100
-		}
-
-		offset := (page - 1) * size
-
-		var totalElements int
-		err := db.QueryRow(`SELECT COUNT(*) FROM "Departamento"`).Scan(&totalElements)
-		if err != nil {
-			errorResponse(c, 500, "Error al contar departamentos", nil)
-			return
-		}
-
-		rows, err := db.Query(
-			`SELECT id, nombre, descripcion FROM "Departamento" LIMIT $1 OFFSET $2`,
-			size, offset,
-		)
-		if err != nil {
-			errorResponse(c, 500, "Error al consultar departamentos", nil)
-			return
-		}
-		defer rows.Close()
-
-		var departamentos []Departamento
-
-		for rows.Next() {
-			var dept Departamento
-			rows.Scan(&dept.ID, &dept.Nombre, &dept.Descripcion)
-			departamentos = append(departamentos, dept)
-		}
-
-		totalPages := int(math.Ceil(float64(totalElements) / float64(size)))
-
-		c.JSON(http.StatusOK, gin.H{
-			"data": departamentos,
-			"pagination": gin.H{
-				"page":          page,
-				"size":          size,
-				"totalElements": totalElements,
-				"totalPages":    totalPages,
-			},
+	if err != nil {
+		errorResponse(c, 409, "El departamento ya existe", []ErrorDetail{
+			{"id", "El id ya está registrado", dept.ID},
 		})
-	})
+		return
+	}
 
-	// GET /departamentos/:id
-	r.GET("/departamentos/:id", func(c *gin.Context) {
-		id := c.Param("id")
+	c.JSON(http.StatusCreated, dept)
+}
 
+// GetDepartamentos godoc
+// @Summary Listar departamentos
+// @Description Obtiene todos los departamentos con paginación
+// @Tags Departamentos
+// @Produce json
+// @Param page query int false "Número de página" default(1)
+// @Param size query int false "Tamaño de página" default(5)
+// @Success 200 {object} PaginatedResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /departamentos [get]
+func GetDepartamentos(c *gin.Context) {
+
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	size, _ := strconv.Atoi(c.DefaultQuery("size", "5"))
+
+	if page < 1 {
+		page = 1
+	}
+	if size < 1 {
+		size = 5
+	}
+	if size > 100 {
+		size = 100
+	}
+
+	offset := (page - 1) * size
+
+	var totalElements int
+	err := db.QueryRow(`SELECT COUNT(*) FROM "Departamento"`).Scan(&totalElements)
+	if err != nil {
+		errorResponse(c, 500, "Error al contar departamentos", nil)
+		return
+	}
+
+	rows, err := db.Query(
+		`SELECT id, nombre, descripcion FROM "Departamento" LIMIT $1 OFFSET $2`,
+		size, offset,
+	)
+	if err != nil {
+		errorResponse(c, 500, "Error al consultar departamentos", nil)
+		return
+	}
+	defer rows.Close()
+
+	var departamentos []Departamento
+
+	for rows.Next() {
 		var dept Departamento
-		err := db.QueryRow(
-			`SELECT id, nombre, descripcion FROM "Departamento" WHERE id=$1`,
-			id,
-		).Scan(&dept.ID, &dept.Nombre, &dept.Descripcion)
+		rows.Scan(&dept.ID, &dept.Nombre, &dept.Descripcion)
+		departamentos = append(departamentos, dept)
+	}
 
-		if err == sql.ErrNoRows {
-			errorResponse(c, 404, "Departamento no encontrado", []ErrorDetail{
-				{"id", "No existe un departamento con este id", id},
-			})
-			return
-		}
+	totalPages := int(math.Ceil(float64(totalElements) / float64(size)))
 
-		if err != nil {
-			errorResponse(c, 500, "Error interno", nil)
-			return
-		}
+	response := PaginatedResponse{
+		Data: departamentos,
+		Pagination: Pagination{
+			Page:          page,
+			Size:          size,
+			TotalElements: totalElements,
+			TotalPages:    totalPages,
+		},
+	}
 
-		c.JSON(http.StatusOK, dept)
-	})
+	c.JSON(http.StatusOK, response)
+}
 
-	r.Run(":8081")
+// GetDepartamentoByID godoc
+// @Summary Obtener departamento por ID
+// @Description Obtiene un departamento específico por su ID
+// @Tags Departamentos
+// @Produce json
+// @Param id path string true "ID del departamento"
+// @Success 200 {object} Departamento
+// @Failure 404 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /departamentos/{id} [get]
+func GetDepartamentoByID(c *gin.Context) {
+	id := c.Param("id")
+
+	var dept Departamento
+	err := db.QueryRow(
+		`SELECT id, nombre, descripcion FROM "Departamento" WHERE id=$1`,
+		id,
+	).Scan(&dept.ID, &dept.Nombre, &dept.Descripcion)
+
+	if err == sql.ErrNoRows {
+		errorResponse(c, 404, "Departamento no encontrado", []ErrorDetail{
+			{"id", "No existe un departamento con este id", id},
+		})
+		return
+	}
+
+	if err != nil {
+		errorResponse(c, 500, "Error interno", nil)
+		return
+	}
+
+	c.JSON(http.StatusOK, dept)
 }

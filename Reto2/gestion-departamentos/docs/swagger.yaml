@@ -1,0 +1,154 @@
+basePath: /
+definitions:
+  main.Departamento:
+    properties:
+      descripcion:
+        type: string
+      id:
+        type: string
+      nombre:
+        type: string
+    type: object
+  main.ErrorDetail:
+    properties:
+      field:
+        type: string
+      message:
+        type: string
+      rejectedValue: {}
+    type: object
+  main.ErrorResponse:
+    properties:
+      error:
+        type: string
+      errors:
+        items:
+          $ref: '#/definitions/main.ErrorDetail'
+        type: array
+      message:
+        type: string
+      path:
+        type: string
+      status:
+        type: integer
+      timestamp:
+        type: string
+    type: object
+  main.PaginatedResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/main.Departamento'
+        type: array
+      pagination:
+        $ref: '#/definitions/main.Pagination'
+    type: object
+  main.Pagination:
+    properties:
+      page:
+        type: integer
+      size:
+        type: integer
+      totalElements:
+        type: integer
+      totalPages:
+        type: integer
+    type: object
+host: localhost:8081
+info:
+  contact: {}
+  description: Microservicio para la gestión de departamentos
+  title: API Gestión de Departamentos
+  version: "1.0"
+paths:
+  /departamentos:
+    get:
+      description: Obtiene todos los departamentos con paginación
+      parameters:
+      - default: 1
+        description: Número de página
+        in: query
+        name: page
+        type: integer
+      - default: 5
+        description: Tamaño de página
+        in: query
+        name: size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.PaginatedResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Listar departamentos
+      tags:
+      - Departamentos
+    post:
+      consumes:
+      - application/json
+      description: Registra un nuevo departamento
+      parameters:
+      - description: Departamento
+        in: body
+        name: departamento
+        required: true
+        schema:
+          $ref: '#/definitions/main.Departamento'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.Departamento'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Crear departamento
+      tags:
+      - Departamentos
+  /departamentos/{id}:
+    get:
+      description: Obtiene un departamento específico por su ID
+      parameters:
+      - description: ID del departamento
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Departamento'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      summary: Obtener departamento por ID
+      tags:
+      - Departamentos
+schemes:
+- http
+swagger: "2.0"
