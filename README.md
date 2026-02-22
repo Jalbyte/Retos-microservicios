@@ -100,26 +100,11 @@ Esto asegura integridad lógica sin compartir base de datos.
 
 ## **Diagrama de Arquitectura**
 
-flowchart LR
-    subgraph Cliente
-        A[Cliente / Navegador]
-    end
-
-    subgraph Docker Network
-        subgraph Servicio_Empleados
-            B[API Empleados\nNode.js + Express]
-            C[(PostgreSQL\nDB Empleados)]
-        end
-
-        subgraph Servicio_Departamentos
-            D[API Departamentos\nGo + Gin]
-            E[(PostgreSQL\nDB Departamentos)]
-        end
-    end
-
-    A -->|HTTP :8080| B
-    A -->|HTTP :8081| D
-
-    B -->|Validación HTTP| D
-    B -->|SQL| C
-    D -->|SQL| E
+```mermaid
+graph LR
+    A[Client] -->|HTTP Requests| B[Employee Service]
+    A -->|HTTP Requests| C[Department Service]
+    B -->|Database Query| D[PostgreSQL]
+    C -->|Database Query| D
+    B -->|Using Node.js Express| E[Node.js]
+    C -->|Using Go Gin| F[Go Gin]
