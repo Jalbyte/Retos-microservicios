@@ -13,4 +13,6 @@ model Empleado {
   apellido String
   cargo  String
   email String
+  departamentoId String
+  fechaIngreso   DateTime
 }

@@ -5,6 +5,12 @@ const app = express();
 const prisma = new PrismaClient();
 app.use(express.json());
 
+const axios = require('axios');
+
+const DEPARTAMENTOS_URL = process.env.DEPARTAMENTOS_URL;
+
+console.log("URL Departamentos:", DEPARTAMENTOS_URL);
+
 // ─── Helper: estructura de error estandarizada ───────────────────────────────
 const HTTP_TEXTS = {
     400: 'Bad Request',
@@ -27,9 +33,10 @@ function errorResponse(res, { status, message, path, errors = [] }) {
 
 // Registrar empleado (POST)
 app.post('/empleado', async (req, res) => {
-    const { nombre, apellido, cargo, email } = req.body;
+    const { nombre, apellido, cargo, email, departamentoId, fechaIngreso } = req.body;
     // Validación de campos requeridos
-    const camposRequeridos = { nombre, apellido, cargo, email };
+    const camposRequeridos = { nombre, apellido, cargo, email, departamentoId, fechaIngreso };
+
     const faltantes = Object.entries(camposRequeridos)
         .filter(([, v]) => v === undefined || v === null || v === '')
         .map(([field]) => ({
@@ -48,15 +55,31 @@ app.post('/empleado', async (req, res) => {
     }
 
     try {
+        //Se valida que el departamento exista antes de crear el empleado
+        try {
+            await axios.get(`${DEPARTAMENTOS_URL}/departamentos/${departamentoId}`)
+        } catch (err) {
+            return errorResponse(res, {
+                status: 400,
+                message: 'Departamento no válido',
+                path: '/empleado',
+                errors: [{
+                    field: 'departamentoId',
+                    message: 'El departamento no existe',
+                    rejectedValue: departamentoId,
+                }],
+            })
+        }
+
         const nuevo = await prisma.empleado.create({
-            data: {nombre, apellido, cargo, email },
+            data: {nombre, apellido, cargo, email, departamentoId, fechaIngreso: new Date(fechaIngreso) },
         });
-        res.status(201).json(nuevo);
+        res.status(201).json(nuevo); // 201 Creado
+
     } catch (error) {
-        console.error("ERROR REAL:", error);  
         if (error.code === 'P2002') {
             return errorResponse(res, {
-                status: 409,
+                status: 409, // Conflicto (credenciales duplicadas)
                 message: `Ya existe un empleado con el id ${id}`,
                 path: '/empleado',
                 errors: [{

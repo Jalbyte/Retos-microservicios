@@ -1,0 +1,69 @@
+# =========================
+# NODE / JAVASCRIPT
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+dist/
+build/
+
+# =========================
+# PRISMA
+# =========================
+.prisma/
+prisma/dev.db
+prisma/dev.db-journal
+
+# =========================
+# ENV FILES
+# =========================
+.env
+.env.local
+.env.development
+.env.production
+
+# =========================
+# LOGS
+# =========================
+logs/
+*.log
+
+# =========================
+# DOCKER
+# =========================
+docker-compose.override.yml
+
+# =========================
+# GO
+# =========================
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+bin/
+vendor/
+
+# =========================
+# IDEs / EDITORS
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# OS FILES
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# TEMP FILES
+# =========================
+*.tmp
+*.temp

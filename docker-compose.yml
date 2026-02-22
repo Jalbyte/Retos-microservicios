@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+
+  # =========================
+  # BASE DE DATOS EMPLEADOS
+  # =========================
+  database-empleados:
+    image: postgres:15
+    container_name: empleados_db
+    restart: always
+    environment:
+      POSTGRES_USER: camilo
+      POSTGRES_PASSWORD: camilo
+      POSTGRES_DB: empleados_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - empleados_data:/var/lib/postgresql/data
+
+  # =========================
+  # BASE DE DATOS DEPARTAMENTOS
+  # =========================
+  database-departamentos:
+    image: postgres:15
+    container_name: departamentos_db
+    restart: always
+    environment:
+      POSTGRES_USER: camilo
+      POSTGRES_PASSWORD: camilo
+      POSTGRES_DB: departamentos_db
+    ports:
+      - "5434:5432"
+    volumes:
+      - departamentos_data:/var/lib/postgresql/data
+
+  # =========================
+  # SERVICIO EMPLEADOS
+  # =========================
+  empleados-service:
+    build: ./Reto1/gestion-empleados
+    container_name: empleados_api
+    restart: always
+    depends_on:
+      - database-empleados
+      - departamentos-service
+    environment:
+      DATABASE_URL: postgresql://camilo:camilo@database-empleados:5432/empleados_db?schema=public
+      DEPARTAMENTOS_URL: http://departamentos-service:8081
+    ports:
+      - "8080:8080"
+
+  # =========================
+  # SERVICIO DEPARTAMENTOS
+  # =========================
+  departamentos-service:
+    build: ./Reto2/gestion-departamentos
+    container_name: departamentos_api
+    restart: always
+    depends_on:
+      - database-departamentos
+    environment:
+      DATABASE_URL: postgresql://camilo:camilo@database-departamentos:5432/departamentos_db?sslmode=disable
+    ports:
+      - "8081:8081"
+
+volumes:
+  empleados_data:
+  departamentos_data:

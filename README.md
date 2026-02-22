@@ -1,34 +1,60 @@
-# RETO 1
+# **Retos Microservicios**
 
-## **Cómo desplegar el proyecto**
-Construir y levantar los contenedores
+Proyecto compuesto por dos microservicios independientes con bases de datos separadas:
 
-Desde la carpeta Reto1 ejecutar:
+### **Reto 1 – Gestión de Empleados**
 
-```java
-docker compose up --build
+* Node.js + Express
+* Prisma ORM
+* PostgreSQL
+
+### **Reto 2 – Gestión de Departamentos**
+
+* Go + Gin
+* PostgreSQL
+
+Cada servicio tiene su propia base de datos, cumpliendo el principio de aislamiento de microservicios.
+
+
+## **Cómo desplegar TODO el proyecto**
+
+Desde la raíz del proyecto ejecutar: 
+
+
+```Docker 
+docker compose up --build -d
 ```
 
-Esto:
-* Construye la imagen del microservicio
-* Descarga la imagen oficial de PostgreSQL
-* Crea la red interna
-* Levanta ambos contenedores
+## **Migraciones (Solo Empleados – Prisma)**
 
-Cuando te salga: 
-Servidor listo en http://localhost:8080
-La API estará activa.
+La base de datos de empleados se crea vacía, por lo que es necesario ejecutar la migración.
 
-**Ejecutar migraciones de Prisma**
+Desde la raíz del proyecto:
+```docker 
+docker compose run --rm empleados-service npx prisma migrate deploy
+```
+Si es la primera vez y no existen migraciones:
 
-La base de datos se crea vacía, por lo tanto es necesario ejecutar la migración para crear las tablas.
-En otra terminal ejecutar:
-
-```java
-docker compose exec empleados-service npx prisma migrate dev --name init
+```docker 
+docker compose run --rm empleados-service npx prisma migrate dev --name init
 ```
 
-Esto:
-* Lee el archivo schema.prisma
-* Genera la migración
-* Crea la tabla Empleado en PostgreSQL
+## **Base de datos Departamentos**
+
+El servicio de departamentos usa PostgreSQL independiente.
+
+Para crear la tabla manualmente:
+
+
+```docker
+docker exec -it departamentos_db psql -U camilo -d departamentos_db
+```
+
+Luego:
+```SQL
+CREATE TABLE "Departamento" (
+    id VARCHAR(50) PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    descripcion TEXT
+);
+```
