@@ -107,13 +107,13 @@ flowchart LR
 
     subgraph Docker Network
         subgraph Servicio_Empleados
-            B[API Empleados\nNode.js + Express]
-            C[(PostgreSQL\nDB Empleados)]
+            B[API Empleados\Node.js + Express]
+            C[(PostgreSQL\DB Empleados)]
         end
 
         subgraph Servicio_Departamentos
-            D[API Departamentos\nGo + Gin]
-            E[(PostgreSQL\nDB Departamentos)]
+            D[API Departamentos\Go + Gin]
+            E[(PostgreSQL\DB Departamentos)]
         end
     end
 
