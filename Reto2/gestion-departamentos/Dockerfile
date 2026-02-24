@@ -1,20 +1,35 @@
-FROM golang:1.25-alpine
-
+# ---------- BUILD STAGE ----------
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 
-# Instalar swag para generar la doc
-RUN go install github.com/swaggo/swag/cmd/swag@latest
+RUN apk add --no-cache git
 
-COPY go.mod go.sum* ./
+COPY go.mod go.sum ./
 RUN go mod download
 
 COPY . .
 
-# GENERAR LOS ARCHIVOS DOCS ANTES DE COMPILAR
+# Instalar swag y generar documentación
+RUN go install github.com/swaggo/swag/cmd/swag@latest
 RUN swag init
 
-RUN go build -o main .
+# Compilar binario
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main .
+
+# ---------- RUNTIME STAGE ----------
+FROM alpine:latest
+
+WORKDIR /app
+
+# Crear usuario no root
+RUN addgroup -S appgroup && adduser -S miguel -G appgroup
+
+COPY --from=builder /app/main .
+
+RUN chown -R miguel:appgroup /app
+
+USER miguel
 
 EXPOSE 8081
 

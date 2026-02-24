@@ -29,7 +29,7 @@ services:
     ports:
       - "5434:5432"
     volumes:
-      - departamentos_data:/var/lib/postgresql/data
+      - ./Reto2/gestion-departamentos/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   # =========================
   # SERVICIO EMPLEADOS
@@ -45,7 +45,7 @@ services:
       PORT: 8080
       DATABASE_URL: postgresql://camilo:camilo@database-empleados:5432/empleados_db?schema=public
       DEPARTAMENTOS_URL: http://departamentos-service:8081
-    ports:
+    ports: 
       - "8080:8080"
 
   # =========================

@@ -55,7 +55,7 @@ Desde ahí se puede:
 * Revisar códigos HTTP
 * Ejecutar requests interactivos
 
-## **Migracioens - PRISMA**
+## **Migraciones - PRISMA**
 
 La base de datos de empleados se crea vacía, por lo que es necesario ejecutar la migración.
 
