@@ -1,101 +1,50 @@
-# **Sistema de Microservicios**
+# Sistema de Microservicios
 
-Este proyecto implementa una arquitectura basada en microservicios desacoplados, donde cada servicio:
+Este proyecto implementa una arquitectura basada en microservicios desacoplados, aplicando principios de resiliencia, aislamiento y comunicación HTTP entre servicios.
 
-- Tiene su propia base de datos
-- Se despliega en contenedores independientes
-- Se comunica vía HTTP
-- Mantiene aislamiento de responsabilidades
+Cada servicio:
 
-## **Arquitectura General**
+- Tiene su propia base de datos PostgreSQL independiente
+- Se ejecuta en contenedores Docker separados
+- Se comunica vía HTTP REST
+- Implementa patrones de resiliencia
+- Posee documentación Swagger propia
+
+---
+
+## Arquitectura General
 
 El sistema está compuesto por:
 
-* Servicio de Empleados
-* Servicio de Departamentos
-* Dos bases de datos PostgreSQL independientes
+- Servicio de Gestión de Empleados (Node.js + Express)
+- Servicio de Gestión de Departamentos (Go + Gin)
+- Base de datos PostgreSQL para Empleados
+- Base de datos PostgreSQL para Departamentos
 
-Cada microservicio expone su propia API REST y documentación Swagger.
+Cada microservicio mantiene independencia total de datos.
 
+---
 
-## **🐳 Despliegue Completo del Sistema**
+## Patrones de Resiliencia Implementados
 
-Desde la raíz del proyecto ejecutar: 
+El sistema implementa:
 
+- Timeout en llamadas HTTP entre microservicios
+- Retry con backoff exponencial
+- Circuit Breaker (opossum)
+- Fallback controlado
+- Healthchecks en todos los servicios
+- Reconexión automática a base de datos (Go)
+- Prevención de fallo en cascada
 
-```Docker 
-docker compose up --build -d
-```
+Esto permite degradación controlada del sistema ante fallos.
 
-Esto levantará:
+---
 
-* Contenedor (Servicio) de empleados
-* Base de datos empleados
-* Contenedor (Servicio) de departamentos
-* Base de datos departamentos
+## Despliegue Completo del Sistema
 
-## **Orden de Inicialización**
-
-El orden correcto de despliegue es:
-
-1. Bases de datos
-2. Servicio de Departamentos
-3. Servicio de Empleados
-
-Docker Compose gestiona automáticamente la red interna entre servicios.
-
-
-## **Migraciones (Solo Empleados – Prisma)**
-
-La base de datos de empleados se crea vacía, por lo que es necesario ejecutar la migración.
-
-Desde la raíz del proyecto:
-```docker 
-docker compose run --rm empleados-service npx prisma migrate deploy
-```
-Si es la primera vez y no existen migraciones:
-
-```docker 
-docker compose run --rm empleados-service npx prisma migrate dev --name init
-```
-
-## **Base de datos Departamentos**
-
-El servicio de departamentos usa PostgreSQL independiente.
-
-Para crear la tabla manualmente:
-
+Desde la raíz del proyecto ejecutar:
 
 ```docker
-docker exec -it departamentos_db psql -U camilo -d departamentos_db
+docker compose up --build -d
 ```
-
-Luego:
-```SQL
-CREATE TABLE "Departamento" (
-    id VARCHAR(50) PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    descripcion TEXT
-);
-```
-## **Acceso a los Servicios**
-
-Una vez levantado el sistema:
-
-| Servicio              | URL                                                                                  |
-| --------------------- | ------------------------------------------------------------------------------------ |
-| Empleados API         | [http://localhost:8080](http://localhost:8080)                                       |
-| Empleados Swagger     | [http://localhost:8080/docs](http://localhost:8080/docs)                             |
-| Departamentos API     | [http://localhost:8081](http://localhost:8081)                                       |
-| Departamentos Swagger | [http://localhost:8081/swagger/index.html](http://localhost:8081/swagger/index.html) |
-
-## **Comunicación Entre Servicios**
-
-El servicio de empleados:
-
-* Consulta al servicio de departamentos antes de registrar un empleado.
-* Si el departamento no existe, rechaza la operación.
-
-Esto asegura integridad lógica sin compartir base de datos.     
-
-
