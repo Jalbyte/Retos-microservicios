@@ -60,7 +60,7 @@ empleados_api
 
 ## **Documentación Swagger**
 
-Disponible en: http://localhost:8081/swagger/index.html
+Disponible en: http://localhost:8080/docs
 
 ## **Base de Datos**
 
