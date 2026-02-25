@@ -48,3 +48,12 @@ Desde la raíz del proyecto ejecutar:
 ```docker
 docker compose up --build -d
 ```
+
+## **Acceso a los servicios**
+
+| Servicio | URL |
+| --- | --- |
+| Empleados API | http://localhost:8080 |
+| Empleados Swagger | http://localhost:8080/docs |
+| Departamentos API | http://localhost:8081 |
+| Departamentos Swagger | http://localhost:8081/swagger/index.html |
