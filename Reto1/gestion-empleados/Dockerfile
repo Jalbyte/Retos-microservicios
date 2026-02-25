@@ -2,7 +2,9 @@ FROM node:20-slim
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y ca-certificates \
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
 RUN groupadd -r appgroup && useradd -r -g appgroup miguel

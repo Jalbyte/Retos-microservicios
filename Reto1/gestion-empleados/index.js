@@ -18,9 +18,42 @@ const swaggerJsdoc = require('swagger-jsdoc');
 const axios = require('axios');
 const PORT = process.env.PORT || 8080;
 const DEPARTAMENTOS_URL = process.env.DEPARTAMENTOS_URL;
+const CircuitBreaker = require('opossum');
 
-console.log("URL Departamentos:", DEPARTAMENTOS_URL);
+// Crear instancia axios con timeout
+const axiosInstance = axios.create({
+  baseURL: DEPARTAMENTOS_URL,
+  timeout: 3000, // 3 segundos
+});
 
+
+async function getDepartamentoWithRetry(id, retries = 3, delay = 500) {
+  try {
+    return await axiosInstance.get(`/departamentos/${id}`);
+  } catch (error) {
+    if (retries === 0) throw error;
+
+    console.log(`Retrying departamento ${id}... intentos restantes: ${retries}`);
+    await new Promise(resolve => setTimeout(resolve, delay));
+
+    return getDepartamentoWithRetry(id, retries - 1, delay * 2);
+  }
+}
+
+const breakerOptions = {
+  timeout: 5000, // tiempo máximo que espera opossum
+  errorThresholdPercentage: 50, // % errores para abrir circuito
+  resetTimeout: 10000, // 10s antes de intentar cerrar circuito
+};
+
+const departamentoBreaker = new CircuitBreaker(
+  (id) => getDepartamentoWithRetry(id),
+  breakerOptions
+);
+
+departamentoBreaker.fallback(() => {
+  throw new Error("Servicio de departamentos no disponible");
+});
 // Configuración de Swagger
 const options = {
   definition: {
@@ -83,7 +116,7 @@ function errorResponse(res, { status, message, path, errors = [] }) {
  *               - apellido
  *               - cargo
  *               - email
- *               - departamentoId
+ *               - departamento_id
  *               - fechaIngreso
  *             properties:
  *               nombre:
@@ -99,7 +132,7 @@ function errorResponse(res, { status, message, path, errors = [] }) {
  *                 type: string
  *                 format: email
  *                 example: "juan@example.com"
- *               departamentoId:
+ *               departamento_id:
  *                 type: integer
  *                 example: 1
  *               fechaIngreso:
@@ -136,8 +169,12 @@ function errorResponse(res, { status, message, path, errors = [] }) {
  *         description: Error interno del servidor
  */
 app.post('/empleado', async (req, res) => {
+
     const { nombre, apellido, cargo, email, departamento_id, fechaIngreso } = req.body;
+
+    
     // Validación de campos requeridos
+    
     const camposRequeridos = { nombre, apellido, cargo, email, departamento_id, fechaIngreso };
 
     const faltantes = Object.entries(camposRequeridos)
@@ -157,54 +194,87 @@ app.post('/empleado', async (req, res) => {
         });
     }
 
+    
+    // Validación de fecha
+
+    const fecha = new Date(fechaIngreso);
+
+    if (isNaN(fecha.getTime())) {
+        return errorResponse(res, {
+            status: 400,
+            message: 'Fecha inválida',
+            path: '/empleado',
+            errors: [{
+                field: 'fechaIngreso',
+                message: 'Formato de fecha inválido',
+                rejectedValue: fechaIngreso,
+            }],
+        });
+    }
+
     try {
-        //Se valida que el departamento exista antes de crear el empleado
+
+        
+        // Validar departamento con Circuit Breaker
+        
         try {
-            await axios.get(`${DEPARTAMENTOS_URL}/departamentos/${departamento_id}`)
+            await departamentoBreaker.fire(departamento_id);
         } catch (err) {
+
+            console.error("ERROR VALIDANDO DEPARTAMENTO:", err);
+
             return errorResponse(res, {
-                status: 400,
-                message: 'Departamento no válido',
+                status: 503,
+                message: 'Servicio de departamentos no disponible',
                 path: '/empleado',
                 errors: [{
-                    field: 'departamentoId',
-                    message: 'El departamento no existe',
-                    rejectedValue: departamentoId,
+                    field: 'departamento_id',
+                    message: 'No se pudo validar el departamento',
+                    rejectedValue: departamento_id,
                 }],
-            })
+            });
         }
 
+        // 
+        // Insert en base de datos
+        // 
         const insertQuery = `
             INSERT INTO empleado (nombre, apellido, cargo, email, departamento_id, fecha_ingreso)
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *;
-            `;
+        `;
 
         const values = [
-        nombre,
-        apellido,
-        cargo,
-        email,
-        departamento_id,
-        new Date(fechaIngreso),
+            nombre,
+            apellido,
+            cargo,
+            email,
+            departamento_id,
+            fecha
         ];
 
         const result = await pool.query(insertQuery, values);
-        res.status(201).json(result.rows[0]);
+
+        return res.status(201).json(result.rows[0]);
 
     } catch (error) {
-        if (error.code === '23505') { // Código de error de PostgreSQL para violación de clave única
+
+        console.error("ERROR AL CREAR EMPLEADO:", error);
+
+        // Error por email duplicado (constraint UNIQUE)
+        if (error.code === '23505') {
             return errorResponse(res, {
-                status: 409, // Conflicto (credenciales duplicadas)
-                message: `Ya existe un empleado con el id ${id}`,
+                status: 409,
+                message: 'El email ya está registrado',
                 path: '/empleado',
                 errors: [{
-                    field: 'id',
-                    message: 'El id ya está registrado',
-                    rejectedValue: id,
+                    field: 'email',
+                    message: 'Ya existe un empleado con este email',
+                    rejectedValue: email,
                 }],
             });
         }
+
         return errorResponse(res, {
             status: 500,
             message: 'Error interno al registrar el empleado',
@@ -212,7 +282,6 @@ app.post('/empleado', async (req, res) => {
         });
     }
 });
-
 /**
  * @swagger
  * /empleado:
@@ -371,6 +440,16 @@ app.get('/empleado/:id', async (req, res) => {
             rejectedValue: id,
         }],
     });
+});
+
+// Ruta de health check
+app.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.status(200).json({ status: 'UP' });
+  } catch (error) {
+    res.status(503).json({ status: 'DOWN' });
+  }
 });
 
 // Ruta 404

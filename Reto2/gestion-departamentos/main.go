@@ -9,6 +9,7 @@ package main
 
 import (
 	"database/sql"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -76,6 +77,35 @@ func errorResponse(c *gin.Context, status int, message string, errors []ErrorDet
 	})
 }
 
+func ensureDBConnection() error {
+	if err := db.Ping(); err != nil {
+
+		log.Println("Conexión perdida. Intentando reconectar...")
+
+		dbURL := os.Getenv("DATABASE_URL")
+
+		newDB, err := sql.Open("postgres", dbURL)
+		if err != nil {
+			return err
+		}
+
+		// Configurar pool nuevamente
+		newDB.SetMaxOpenConns(25)
+		newDB.SetMaxIdleConns(25)
+		newDB.SetConnMaxLifetime(5 * time.Minute)
+
+		// Probar conexión
+		if err := newDB.Ping(); err != nil {
+			return err
+		}
+
+		db = newDB
+		log.Println("Reconexión exitosa a la base de datos")
+	}
+
+	return nil
+}
+
 func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -89,21 +119,75 @@ func main() {
 
 	var err error
 	db, err = sql.Open("postgres", dbURL)
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
 	if err != nil {
 		panic(err)
 	}
+
+	// Esperar a que la base esté lista
+	for i := 0; i < 10; i++ {
+		err = db.Ping()
+		if err == nil {
+			break
+		}
+
+		log.Println("Esperando conexión a la base de datos...")
+		time.Sleep(3 * time.Second)
+	}
+
+	if err != nil {
+		panic("No se pudo conectar a la base después de varios intentos")
+	}
+
 	defer db.Close()
 
 	r := gin.Default()
 
+	r.Use(DBMiddleware())
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
 		ginSwagger.URL("/swagger/doc.json"),
 	))
 	r.POST("/departamentos", CreateDepartamento)
 	r.GET("/departamentos", GetDepartamentos)
 	r.GET("/departamentos/:id", GetDepartamentoByID)
-
+	r.Any("/health", health)
 	r.Run(":" + port)
+}
+
+func health(c *gin.Context) {
+
+	if err := db.Ping(); err != nil {
+		c.JSON(503, gin.H{
+			"status": "DOWN",
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status": "UP",
+	})
+}
+
+func DBMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		// No aplicar middleware al health
+		if c.Request.URL.Path == "/health" {
+			c.Next()
+			return
+		}
+
+		if err := ensureDBConnection(); err != nil {
+			errorResponse(c, 503, "Base de datos no disponible", nil)
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
 }
 
 //

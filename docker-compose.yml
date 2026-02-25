@@ -13,7 +13,14 @@ services:
     ports:
       - "5433:5432"
     volumes:
+      - empleados_data:/var/lib/postgresql/data
       - ./Reto1/gestion-empleados/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U camilo -d empleados_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # =========================
   # BASE DE DATOS DEPARTAMENTOS
@@ -29,7 +36,14 @@ services:
     ports:
       - "5434:5432"
     volumes:
+      - departamentos_data:/var/lib/postgresql/data
       - ./Reto2/gestion-departamentos/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U camilo -d departamentos_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # =========================
   # SERVICIO EMPLEADOS
@@ -39,14 +53,22 @@ services:
     container_name: empleados_api
     restart: always
     depends_on:
-      - database-empleados
-      - departamentos-service
+      database-empleados:
+        condition: service_healthy
+      departamentos-service:
+        condition: service_healthy
     environment:
       PORT: 8080
       DATABASE_URL: postgresql://camilo:camilo@database-empleados:5432/empleados_db?schema=public
       DEPARTAMENTOS_URL: http://departamentos-service:8081
     ports: 
       - "8080:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
+      interval: 10s 
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
   # =========================
   # SERVICIO DEPARTAMENTOS
@@ -56,12 +78,19 @@ services:
     container_name: departamentos_api
     restart: always
     depends_on:
-      - database-departamentos
+      database-departamentos:
+        condition: service_healthy
     environment:
       PORT: 8081
       DATABASE_URL: postgresql://camilo:camilo@database-departamentos:5432/departamentos_db?sslmode=disable
     ports:
       - "8081:8081"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   empleados_data:

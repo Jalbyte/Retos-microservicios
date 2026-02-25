@@ -22,6 +22,8 @@ FROM alpine:latest
 
 WORKDIR /app
 
+RUN apk add --no-cache wget ca-certificates
+
 # Crear usuario no root
 RUN addgroup -S appgroup && adduser -S miguel -G appgroup
 
