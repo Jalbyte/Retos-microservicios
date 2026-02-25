@@ -1,10 +1,15 @@
-
-const express = require('express');
-const { PrismaClient } = require('@prisma/client');
+const express = require('express'); 
 // Cargar variables de entorno
 const app = express();
-const prisma = new PrismaClient();
 app.use(express.json());
+
+const { Pool } = require('pg');
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+
 // CORS middleware
 const swaggerUi = require('swagger-ui-express');
 const swaggerJsdoc = require('swagger-jsdoc');
@@ -119,7 +124,7 @@ function errorResponse(res, { status, message, path, errors = [] }) {
  *                   type: string
  *                 email:
  *                   type: string
- *                 departamentoId:
+ *                 departamento_id:
  *                   type: integer
  *                 fechaIngreso:
  *                   type: string
@@ -131,9 +136,9 @@ function errorResponse(res, { status, message, path, errors = [] }) {
  *         description: Error interno del servidor
  */
 app.post('/empleado', async (req, res) => {
-    const { nombre, apellido, cargo, email, departamentoId, fechaIngreso } = req.body;
+    const { nombre, apellido, cargo, email, departamento_id, fechaIngreso } = req.body;
     // Validación de campos requeridos
-    const camposRequeridos = { nombre, apellido, cargo, email, departamentoId, fechaIngreso };
+    const camposRequeridos = { nombre, apellido, cargo, email, departamento_id, fechaIngreso };
 
     const faltantes = Object.entries(camposRequeridos)
         .filter(([, v]) => v === undefined || v === null || v === '')
@@ -155,7 +160,7 @@ app.post('/empleado', async (req, res) => {
     try {
         //Se valida que el departamento exista antes de crear el empleado
         try {
-            await axios.get(`${DEPARTAMENTOS_URL}/departamentos/${departamentoId}`)
+            await axios.get(`${DEPARTAMENTOS_URL}/departamentos/${departamento_id}`)
         } catch (err) {
             return errorResponse(res, {
                 status: 400,
@@ -169,13 +174,26 @@ app.post('/empleado', async (req, res) => {
             })
         }
 
-        const nuevo = await prisma.empleado.create({
-            data: {nombre, apellido, cargo, email, departamentoId, fechaIngreso: new Date(fechaIngreso) },
-        });
-        res.status(201).json(nuevo); // 201 Creado
+        const insertQuery = `
+            INSERT INTO empleado (nombre, apellido, cargo, email, departamento_id, fecha_ingreso)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *;
+            `;
+
+        const values = [
+        nombre,
+        apellido,
+        cargo,
+        email,
+        departamento_id,
+        new Date(fechaIngreso),
+        ];
+
+        const result = await pool.query(insertQuery, values);
+        res.status(201).json(result.rows[0]);
 
     } catch (error) {
-        if (error.code === 'P2002') {
+        if (error.code === '23505') { // Código de error de PostgreSQL para violación de clave única
             return errorResponse(res, {
                 status: 409, // Conflicto (credenciales duplicadas)
                 message: `Ya existe un empleado con el id ${id}`,
@@ -240,7 +258,7 @@ app.post('/empleado', async (req, res) => {
  *                         type: string
  *                       email:
  *                         type: string
- *                       departamentoId:
+ *                       departamento_id:
  *                         type: integer
  *                       fechaIngreso:
  *                         type: string
@@ -259,23 +277,37 @@ app.post('/empleado', async (req, res) => {
  *         description: Error interno del servidor
  */
 app.get('/empleado', async (req, res) => {
+  try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const size = Math.min(100, Math.max(1, parseInt(req.query.size) || 5));
     const skip = (page - 1) * size;
 
-    const [totalElements, data] = await Promise.all([
-        prisma.empleado.count(),
-        prisma.empleado.findMany({ skip, take: size }),
-    ]);
+    // Total de registros
+    const countResult = await pool.query('SELECT COUNT(*) FROM empleado');
+    const totalElements = parseInt(countResult.rows[0].count);
+
+    // Datos paginados
+    const dataResult = await pool.query(
+      'SELECT * FROM empleado ORDER BY id LIMIT $1 OFFSET $2',
+      [size, skip]
+    );
 
     const totalPages = Math.ceil(totalElements / size);
 
     res.json({
-        data,
-        pagination: { page, size, totalElements, totalPages },
+      data: dataResult.rows,
+      pagination: { page, size, totalElements, totalPages },
     });
-});
 
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({
+      status: 500,
+      error: "Internal Server Error",
+      message: "Error al obtener empleados"
+    });
+  }
+});
 /**
  * @swagger
  * /empleado/{id}:
@@ -309,7 +341,7 @@ app.get('/empleado', async (req, res) => {
  *                   type: string
  *                 email:
  *                   type: string
- *                 departamentoId:
+ *                 departamento_id:
  *                   type: integer
  *                 fechaIngreso:
  *                   type: string
@@ -318,14 +350,15 @@ app.get('/empleado', async (req, res) => {
  *       500:
  *         description: Error interno del servidor
  */
-app.get('/empleado/:id', async (req, res) => {
+app.get('/empleado/:id', async (req, res) => {      
     const { id } = req.params;
-    const empleado = await prisma.empleado.findUnique({
-        where: { id: parseInt(id) },
-    });
+    const result = await pool.query(
+        'SELECT * FROM empleado WHERE id = $1',
+        [parseInt(id)]
+    );
 
-    if (empleado) {
-        return res.json(empleado);
+    if (result.rows.length > 0) {
+    return res.json(result.rows[0]);
     }
 
     return errorResponse(res, {

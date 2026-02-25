@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS empleado (
+    id SERIAL PRIMARY KEY,
+    nombre VARCHAR(100) NOT NULL,
+    apellido VARCHAR(100) NOT NULL,
+    cargo VARCHAR(100) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    departamento_id VARCHAR(50) NOT NULL,
+    fecha_ingreso TIMESTAMP NOT NULL
+);

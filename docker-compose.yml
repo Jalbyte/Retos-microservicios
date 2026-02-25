@@ -13,7 +13,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - empleados_data:/var/lib/postgresql/data
+      - ./Reto1/gestion-empleados/init.sql:/docker-entrypoint-initdb.d/init.sql
 
   # =========================
   # BASE DE DATOS DEPARTAMENTOS
