@@ -16,7 +16,7 @@ services:
       - empleados_data:/var/lib/postgresql/data
       - ./Reto1/gestion-empleados/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U camilo -d empleados_db"]
+      test: [ "CMD-SHELL", "pg_isready -U camilo -d empleados_db" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -39,11 +39,38 @@ services:
       - departamentos_data:/var/lib/postgresql/data
       - ./Reto2/gestion-departamentos/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U camilo -d departamentos_db"]
+      test: [ "CMD-SHELL", "pg_isready -U camilo -d departamentos_db" ]
       interval: 5s
       timeout: 5s
       retries: 5
       start_period: 15s
+
+  # =========================
+  # ZOOKEEPER
+  # =========================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  # =========================
+  # KAFKA
+  # =========================
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   # =========================
   # SERVICIO EMPLEADOS
@@ -61,11 +88,11 @@ services:
       PORT: 8080
       DATABASE_URL: postgresql://camilo:camilo@database-empleados:5432/empleados_db?schema=public
       DEPARTAMENTOS_URL: http://departamentos-service:8081
-    ports: 
+    ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
-      interval: 10s 
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8080/health" ]
+      interval: 10s
       timeout: 5s
       retries: 5
       start_period: 15s
@@ -86,7 +113,7 @@ services:
     ports:
       - "8081:8081"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8081/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
