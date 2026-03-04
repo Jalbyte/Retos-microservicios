@@ -46,6 +46,28 @@ services:
       start_period: 15s
 
   # =========================
+  # BASE DE DATOS NOTIFICACIONES
+  # =========================
+  notification-db:
+    image: mysql:8.0
+    container_name: notification_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: notifications
+    ports:
+      - "3306:3306"
+    volumes:
+      - notifications_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =========================
   # SERVICIO EMPLEADOS
   # =========================
   empleados-service:
@@ -58,7 +80,7 @@ services:
       departamentos-service:
         condition: service_healthy
       rabbitmq:
-        condition: service_started
+        condition: service_healthy
     environment:
       PORT: 8080
       DATABASE_URL: postgresql://camilo:camilo@database-empleados:5432/empleados_db?schema=public
@@ -108,7 +130,43 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: admin
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =========================
+  # SERVICIO NOTIFICACIONES
+  # =========================
+  notificaciones-service:
+    build: ./Reto3/servicio-notificaciones
+    container_name: notificaciones_api
+    restart: always
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DB_HOST: notification-db
+      DB_USER: root
+      DB_PASSWORD: rootpassword
+      DB_NAME: notifications
+      DB_PORT: 3306
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      RABBITMQ_EXCHANGE: empleados_exchange
+    ports:
+      - "8084:8084"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8084/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
 
 volumes:
   empleados_data:
   departamentos_data:
+  notifications_data:
