@@ -68,6 +68,28 @@ services:
       start_period: 30s
 
   # =========================
+  # BASE DE DATOS PERFILES
+  # =========================
+  perfiles-db:
+    image: postgres:15
+    container_name: perfiles_db
+    restart: always
+    environment:
+      POSTGRES_USER: camilo
+      POSTGRES_PASSWORD: camilo
+      POSTGRES_DB: perfiles_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - perfiles_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U camilo -d perfiles_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # =========================
   # SERVICIO EMPLEADOS
   # =========================
   empleados-service:
@@ -164,9 +186,40 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
+      start_period: 30s
+
+  # =========================
+  # SERVICIO PERFILES
+  # =========================
+  perfiles-service:
+    build: ./Reto3/gestion-perfiles
+    container_name: perfiles_api
+    restart: always
+    depends_on:
+      perfiles-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      PORT: 8085
+      DB_HOST: perfiles-db
+      DB_PORT: 5432
+      DB_USER: camilo
+      DB_PASSWORD: camilo
+      DB_NAME: perfiles_db
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      RABBITMQ_EXCHANGE: empleados_exchange
+    ports:
+      - "8085:8085"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8085/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
 volumes:
   empleados_data:
   departamentos_data:
   notifications_data:
+  perfiles_data:
