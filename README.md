@@ -273,4 +273,3 @@ curl -X PUT http://localhost:8085/perfiles/<empleadoId> \
         │   └── service/            # PerfilService
         ├── src/main/resources/application.properties
         └── README.md
-```
