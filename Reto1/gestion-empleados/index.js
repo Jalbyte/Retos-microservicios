@@ -12,7 +12,7 @@ const pool = new Pool({
 // Conectar a RabbitMQ
 const { connectRabbit, publishEvent } = require("./rabbitmq");
 
-connectRabbit();
+connectRabbit().catch(err => console.error('[RabbitMQ] Error al iniciar conexión:', err.message));
 
 // CORS middleware
 const swaggerUi = require('swagger-ui-express');
@@ -163,8 +163,13 @@ function errorResponse(res, { status, message, path, errors = [] }) {
  *                   type: string
  *                 departamento_id:
  *                   type: integer
- *                 fechaIngreso:
+ *                 fecha_ingreso:
  *                   type: string
+ *                   format: date-time
+ *                 is_active:
+ *                   type: boolean
+ *                   example: true
+ *                   description: Indica si el empleado está activo en el sistema
  *       400:
  *         description: Error de validación - campos requeridos faltantes o departamento no válido
  *       409:
@@ -310,8 +315,8 @@ app.post('/empleado', async (req, res) => {
  * @swagger
  * /empleado:
  *   get:
- *     summary: Listar todos los empleados
- *     description: Obtiene una lista paginada de empleados del sistema
+ *     summary: Listar todos los empleados activos
+ *     description: Obtiene una lista paginada de empleados activos (is_active = true). Los empleados desactivados mediante soft delete no aparecen en este listado.
  *     tags:
  *       - Empleados
  *     parameters:
@@ -330,7 +335,7 @@ app.post('/empleado', async (req, res) => {
  *         description: Cantidad de registros por página
  *     responses:
  *       200:
- *         description: Lista de empleados obtenida exitosamente
+ *         description: Lista paginada de empleados activos
  *         content:
  *           application/json:
  *             schema:
@@ -353,8 +358,13 @@ app.post('/empleado', async (req, res) => {
  *                         type: string
  *                       departamento_id:
  *                         type: integer
- *                       fechaIngreso:
+ *                       fecha_ingreso:
  *                         type: string
+ *                         format: date-time
+ *                       is_active:
+ *                         type: boolean
+ *                         example: true
+ *                         description: Siempre true en este listado (solo se devuelven activos)
  *                 pagination:
  *                   type: object
  *                   properties:
@@ -364,6 +374,7 @@ app.post('/empleado', async (req, res) => {
  *                       type: integer
  *                     totalElements:
  *                       type: integer
+ *                       description: Total de empleados activos
  *                     totalPages:
  *                       type: integer
  *       500:
@@ -375,13 +386,13 @@ app.get('/empleado', async (req, res) => {
     const size = Math.min(100, Math.max(1, parseInt(req.query.size) || 5));
     const skip = (page - 1) * size;
 
-    // Total de registros
-    const countResult = await pool.query('SELECT COUNT(*) FROM empleado');
+    // Total de registros activos
+    const countResult = await pool.query('SELECT COUNT(*) FROM empleado WHERE is_active = true');
     const totalElements = parseInt(countResult.rows[0].count);
 
-    // Datos paginados
+    // Datos paginados (solo activos)
     const dataResult = await pool.query(
-      'SELECT * FROM empleado ORDER BY id LIMIT $1 OFFSET $2',
+      'SELECT * FROM empleado WHERE is_active = true ORDER BY id LIMIT $1 OFFSET $2',
       [size, skip]
     );
 
@@ -406,7 +417,7 @@ app.get('/empleado', async (req, res) => {
  * /empleado/{id}:
  *   get:
  *     summary: Obtener empleado por ID
- *     description: Obtiene los detalles de un empleado específico
+ *     description: Obtiene los detalles de un empleado activo por su ID. Retorna 404 si el empleado no existe o ha sido desactivado (soft delete).
  *     tags:
  *       - Empleados
  *     parameters:
@@ -418,7 +429,7 @@ app.get('/empleado', async (req, res) => {
  *         description: ID del empleado
  *     responses:
  *       200:
- *         description: Empleado encontrado
+ *         description: Empleado activo encontrado
  *         content:
  *           application/json:
  *             schema:
@@ -436,17 +447,21 @@ app.get('/empleado', async (req, res) => {
  *                   type: string
  *                 departamento_id:
  *                   type: integer
- *                 fechaIngreso:
+ *                 fecha_ingreso:
  *                   type: string
+ *                   format: date-time
+ *                 is_active:
+ *                   type: boolean
+ *                   example: true
  *       404:
- *         description: Empleado no encontrado
+ *         description: Empleado no encontrado o inactivo
  *       500:
  *         description: Error interno del servidor
  */
 app.get('/empleado/:id', async (req, res) => {
   const { id } = req.params;
   const result = await pool.query(
-    'SELECT * FROM empleado WHERE id = $1',
+    'SELECT * FROM empleado WHERE id = $1 AND is_active = true',
     [parseInt(id)]
   );
 
@@ -470,8 +485,12 @@ app.get('/empleado/:id', async (req, res) => {
  * @swagger
  * /empleado/{id}:
  *   delete:
- *     summary: Eliminar empleado
- *     description: Elimina un empleado del sistema
+ *     summary: Desactivar empleado (soft delete)
+ *     description: |
+ *       Desactiva un empleado marcándolo como inactivo (`is_active = false`).
+ *       El registro **no se elimina físicamente** de la base de datos.
+ *       Tras la desactivación se publica el evento `empleado.eliminado` en RabbitMQ.
+ *       Los endpoints `GET /empleado` y `GET /empleado/{id}` dejarán de devolver este empleado.
  *     tags:
  *       - Empleados
  *     parameters:
@@ -480,10 +499,10 @@ app.get('/empleado/:id', async (req, res) => {
  *         required: true
  *         schema:
  *           type: integer
- *         description: ID del empleado
+ *         description: ID del empleado a desactivar
  *     responses:
  *       200:
- *         description: Empleado eliminado exitosamente
+ *         description: Empleado desactivado exitosamente
  *         content:
  *           application/json:
  *             schema:
@@ -491,9 +510,10 @@ app.get('/empleado/:id', async (req, res) => {
  *               properties:
  *                 message:
  *                   type: string
- *                   example: "Empleado eliminado exitosamente"
+ *                   example: "Empleado desactivado exitosamente"
  *                 empleado:
  *                   type: object
+ *                   description: Estado final del empleado en la base de datos
  *                   properties:
  *                     id:
  *                       type: integer
@@ -507,10 +527,15 @@ app.get('/empleado/:id', async (req, res) => {
  *                       type: string
  *                     departamento_id:
  *                       type: integer
- *                     fechaIngreso:
+ *                     fecha_ingreso:
  *                       type: string
+ *                       format: date-time
+ *                     is_active:
+ *                       type: boolean
+ *                       example: false
+ *                       description: Siempre false tras la desactivación
  *       404:
- *         description: Empleado no encontrado
+ *         description: Empleado no encontrado o ya estaba inactivo
  *       500:
  *         description: Error interno del servidor
  */
@@ -518,7 +543,7 @@ app.delete('/empleado/:id', async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
-      'DELETE FROM empleado WHERE id = $1 RETURNING *',
+      'UPDATE empleado SET is_active = false WHERE id = $1 AND is_active = true RETURNING *',
       [parseInt(id)]
     );
 
@@ -555,7 +580,7 @@ app.delete('/empleado/:id', async (req, res) => {
     }
 
     return res.json({
-      message: "Empleado eliminado exitosamente",
+      message: "Empleado desactivado exitosamente",
       empleado: result.rows[0],
     });
   } catch (error) {

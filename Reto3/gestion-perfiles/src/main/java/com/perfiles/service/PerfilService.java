@@ -5,10 +5,11 @@ import com.perfiles.model.Perfil;
 import com.perfiles.repository.PerfilRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -72,9 +73,26 @@ public class PerfilService {
     }
 
     /**
-     * Retorna todos los perfiles registrados.
+     * Desactiva el perfil asociado a un empleado (soft delete).
+     * Llamado al recibir el evento empleado.eliminado desde RabbitMQ.
+     * @return true si el perfil fue encontrado y desactivado, false si no existe
      */
-    public List<Perfil> listarTodos() {
-        return repository.findAll();
+    public boolean desactivar(String empleadoId) {
+        return repository.findByEmpleadoId(empleadoId).map(perfil -> {
+            perfil.setActive(false);
+            repository.save(perfil);
+            log.info("[PERFILES] Perfil desactivado para empleadoId={}", empleadoId);
+            return true;
+        }).orElseGet(() -> {
+            log.warn("[PERFILES] No se encontró perfil para desactivar, empleadoId={}", empleadoId);
+            return false;
+        });
+    }
+
+    /**
+     * Retorna todos los perfiles registrados de forma paginada.
+     */
+    public Page<Perfil> listarTodos(Pageable pageable) {
+        return repository.findAll(pageable);
     }
 }

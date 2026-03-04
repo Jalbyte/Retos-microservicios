@@ -25,8 +25,6 @@ public class EmpleadoEventConsumer {
      *   "event": "empleado.creado" | "empleado.eliminado",
      *   "data": { ... }
      * }
-     *
-     * Solo se procesa el evento empleado.creado.
      */
     @RabbitListener(queues = "perfiles.queue")
     public void handleEmpleadoEvent(String messageBody) {
@@ -34,19 +32,27 @@ public class EmpleadoEventConsumer {
             JsonNode root      = objectMapper.readTree(messageBody);
             String   eventType = root.path("event").asText();
 
-            if ("empleado.creado".equals(eventType)) {
-                JsonNode data       = root.path("data");
-                String   empleadoId = data.path("id").asText();
-                String   nombre     = data.path("nombre").asText();
-                String   email      = data.path("email").asText();
+            switch (eventType) {
+                case "empleado.creado" -> {
+                    JsonNode data       = root.path("data");
+                    String   empleadoId = data.path("id").asText();
+                    String   nombre     = data.path("nombre").asText();
+                    String   email      = data.path("email").asText();
 
-                log.info("[CONSUMER] Evento empleado.creado recibido — id: {}, nombre: {}, email: {}",
-                        empleadoId, nombre, email);
+                    log.info("[CONSUMER] Evento empleado.creado recibido — id: {}, nombre: {}, email: {}",
+                            empleadoId, nombre, email);
 
-                perfilService.crearPerfilPorDefecto(empleadoId, nombre, email);
-            } else {
-                // Ignoramos eventos que no son de interés (empleado.eliminado, etc.)
-                log.debug("[CONSUMER] Evento ignorado: {}", eventType);
+                    perfilService.crearPerfilPorDefecto(empleadoId, nombre, email);
+                }
+                case "empleado.eliminado" -> {
+                    JsonNode data       = root.path("data");
+                    String   empleadoId = data.path("id").asText();
+
+                    log.info("[CONSUMER] Evento empleado.eliminado recibido — id: {}", empleadoId);
+
+                    perfilService.desactivar(empleadoId);
+                }
+                default -> log.debug("[CONSUMER] Evento ignorado: {}", eventType);
             }
 
         } catch (Exception e) {

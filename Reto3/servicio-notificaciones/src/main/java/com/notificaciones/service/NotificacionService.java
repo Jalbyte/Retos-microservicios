@@ -4,10 +4,11 @@ import com.notificaciones.model.Notificacion;
 import com.notificaciones.repository.NotificacionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -64,16 +65,16 @@ public class NotificacionService {
     }
 
     /**
-     * Lista todas las notificaciones registradas, ordenadas por fecha descendente.
+     * Lista todas las notificaciones de forma paginada.
      */
-    public List<Notificacion> listarTodas() {
-        return repository.findAll();
+    public Page<Notificacion> listarTodas(Pageable pageable) {
+        return repository.findAll(pageable);
     }
 
     /**
-     * Lista las notificaciones de un empleado específico.
+     * Lista las notificaciones de un empleado específico de forma paginada.
      */
-    public List<Notificacion> listarPorEmpleado(String empleadoId) {
-        return repository.findByEmpleadoIdOrderByFechaEnvioDesc(empleadoId);
+    public Page<Notificacion> listarPorEmpleado(String empleadoId, Pageable pageable) {
+        return repository.findByEmpleadoIdOrderByFechaEnvioDesc(empleadoId, pageable);
     }
 }

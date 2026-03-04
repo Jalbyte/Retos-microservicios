@@ -54,4 +54,9 @@ public class Perfil {
     @Column(nullable = false, updatable = false)
     @Schema(description = "Fecha y hora de creación del perfil", accessMode = Schema.AccessMode.READ_ONLY)
     private LocalDateTime fechaCreacion;
+
+    @Column(nullable = false)
+    @Builder.Default
+    @Schema(description = "Indica si el perfil está activo. Se desactiva automáticamente al recibir el evento empleado.eliminado.", example = "true", accessMode = Schema.AccessMode.READ_ONLY)
+    private boolean isActive = true;
 }

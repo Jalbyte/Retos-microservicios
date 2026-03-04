@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS empleado (
     cargo VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     departamento_id VARCHAR(50) NOT NULL,
-    fecha_ingreso TIMESTAMP NOT NULL
+    fecha_ingreso TIMESTAMP NOT NULL,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
