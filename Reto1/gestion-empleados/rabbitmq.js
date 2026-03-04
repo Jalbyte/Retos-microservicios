@@ -1,34 +1,34 @@
-const amqp = require("amqplib");
+const amqp = require('amqplib');
+
+const EXCHANGE = 'empleados_exchange';
 
 let channel;
 
-async function connectRabbitMQ() {
-    try {
-        const connection = await amqp.connect("amqp://admin:admin@rabbitmq:5672");
-        channel = await connection.createChannel();
+async function connectRabbit() {
+    const connection = await amqp.connect(process.env.RABBITMQ_URL);
+    channel = await connection.createChannel();
 
-        await channel.assertExchange("empleados_exchange", "fanout", {
-            durable: true,
-        });
-
-        console.log("Conectado a RabbitMQ");
-    } catch (error) {
-        console.error("Error conectando a RabbitMQ:", error);
-    }
-}
-
-async function publishEvent(eventType, data) {
-    if (!channel) {
-        console.error("RabbitMQ no está conectado");
-        return;
-    }
-
-    const message = JSON.stringify({
-        type: eventType,
-        data,
+    await channel.assertExchange(EXCHANGE, 'fanout', {
+        durable: true
     });
 
-    channel.publish("empleados_exchange", "", Buffer.from(message));
+    console.log("Conectado a RabbitMQ");
 }
 
-module.exports = { connectRabbitMQ, publishEvent };
+async function publishEvent(event) {
+    try {
+        channel.publish(
+            EXCHANGE,
+            '',
+            Buffer.from(JSON.stringify(event)),
+            { persistent: true }
+        );
+    } catch (error) {
+        console.error("Error publicando evento:", error.message);
+    }
+}
+
+module.exports = {
+    connectRabbit,
+    publishEvent
+};

@@ -10,9 +10,9 @@ const pool = new Pool({
 });
 
 // Conectar a RabbitMQ
-const { connectRabbitMQ } = require("./rabbitmq");
+const { connectRabbit, publishEvent } = require("./rabbitmq");
 
-connectRabbitMQ();
+connectRabbit();
 
 // CORS middleware
 const swaggerUi = require('swagger-ui-express');
@@ -176,10 +176,6 @@ app.post('/empleado', async (req, res) => {
 
   const { nombre, apellido, cargo, email, departamento_id, fechaIngreso } = req.body;
 
-
-  const { publishEvent } = require('./rabbitmq');
-
-
   // Validación de campos requeridos
 
   const camposRequeridos = { nombre, apellido, cargo, email, departamento_id, fechaIngreso };
@@ -266,13 +262,15 @@ app.post('/empleado', async (req, res) => {
 
     //  Publicar evento en RabbitMQ (NO afecta a la BD si falla)
     try {
-      await publishEvent("empleado.creado", {
-        id: empleadoCreado.id,
-        nombre: empleadoCreado.nombre,
-        apellido: empleadoCreado.apellido,
-        email: empleadoCreado.email,
-        departamentoId: empleadoCreado.departamento_id,
-        fechaIngreso: empleadoCreado.fecha_ingreso,
+      await publishEvent({
+        event: "empleado.creado",
+        data: {
+          id: empleadoCreado.id,
+          nombre: empleadoCreado.nombre,
+          email: empleadoCreado.email,
+          departamentoId: empleadoCreado.departamento_id,
+          fechaIngreso: empleadoCreado.fecha_ingreso
+        }
       });
 
       console.log("Evento empleado.creado publicado");
@@ -468,6 +466,108 @@ app.get('/empleado/:id', async (req, res) => {
   });
 });
 
+/**
+ * @swagger
+ * /empleado/{id}:
+ *   delete:
+ *     summary: Eliminar empleado
+ *     description: Elimina un empleado del sistema
+ *     tags:
+ *       - Empleados
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del empleado
+ *     responses:
+ *       200:
+ *         description: Empleado eliminado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Empleado eliminado exitosamente"
+ *                 empleado:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     nombre:
+ *                       type: string
+ *                     apellido:
+ *                       type: string
+ *                     cargo:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     departamento_id:
+ *                       type: integer
+ *                     fechaIngreso:
+ *                       type: string
+ *       404:
+ *         description: Empleado no encontrado
+ *       500:
+ *         description: Error interno del servidor
+ */
+app.delete('/empleado/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      'DELETE FROM empleado WHERE id = $1 RETURNING *',
+      [parseInt(id)]
+    );
+
+    if (result.rowCount === 0) {
+      return errorResponse(res, {
+        status: 404,
+        message: `El empleado con id ${id} no existe`,
+        path: `/empleado/${id}`,
+        errors: [{
+          field: 'id',
+          message: 'No se encontró ningún empleado con este id',
+          rejectedValue: id,
+        }],
+      });
+    }
+
+    // Publicar evento de eliminación
+    try {
+      await publishEvent({
+        event: "empleado.eliminado",
+        data: {
+          id: result.rows[0].id,
+          nombre: result.rows[0].nombre,
+          apellido: result.rows[0].apellido,
+          cargo: result.rows[0].cargo,
+          email: result.rows[0].email,
+          departamento_id: result.rows[0].departamento_id,
+          fechaIngreso: result.rows[0].fecha_ingreso
+        }
+      });
+      console.log("Evento empleado.eliminado publicado");
+    } catch (err) {
+      console.error("Error publicando evento:", err);
+    }
+
+    return res.json({
+      message: "Empleado eliminado exitosamente",
+      empleado: result.rows[0],
+    });
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, {
+      status: 500,
+      message: 'Error interno al eliminar el empleado',
+      path: `/empleado/${id}`,
+    });
+  }
+});
+
 // Ruta de health check
 app.get('/health', async (req, res) => {
   try {
@@ -490,3 +590,4 @@ app.use((req, res) => {
 app.listen(PORT, () => {
   console.log(`Servidor listo en http://localhost:${PORT}`);
 });
+
