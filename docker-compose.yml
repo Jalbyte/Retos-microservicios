@@ -14,9 +14,9 @@ services:
       - "5433:5432"
     volumes:
       - empleados_data:/var/lib/postgresql/data
-      - ./Reto1/gestion-empleados/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./Reto1/gestion-empleados/init.sql:/docker-entrypoint-initdb.d/init.sql:Z
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U camilo -d empleados_db"]
+      test: [ "CMD-SHELL", "pg_isready -U camilo -d empleados_db" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -37,9 +37,53 @@ services:
       - "5434:5432"
     volumes:
       - departamentos_data:/var/lib/postgresql/data
-      - ./Reto2/gestion-departamentos/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./Reto2/gestion-departamentos/init.sql:/docker-entrypoint-initdb.d/init.sql:Z
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U camilo -d departamentos_db"]
+      test: [ "CMD-SHELL", "pg_isready -U camilo -d departamentos_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # =========================
+  # BASE DE DATOS NOTIFICACIONES
+  # =========================
+  notification-db:
+    image: mysql:8.0
+    container_name: notification_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: notifications
+    ports:
+      - "3306:3306"
+    volumes:
+      - notifications_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-prootpassword" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =========================
+  # BASE DE DATOS PERFILES
+  # =========================
+  perfiles-db:
+    image: postgres:15
+    container_name: perfiles_db
+    restart: always
+    environment:
+      POSTGRES_USER: camilo
+      POSTGRES_PASSWORD: camilo
+      POSTGRES_DB: perfiles_db
+    ports:
+      - "5435:5432"
+    volumes:
+      - perfiles_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U camilo -d perfiles_db" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -57,15 +101,18 @@ services:
         condition: service_healthy
       departamentos-service:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     environment:
       PORT: 8080
       DATABASE_URL: postgresql://camilo:camilo@database-empleados:5432/empleados_db?schema=public
       DEPARTAMENTOS_URL: http://departamentos-service:8081
-    ports: 
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+    ports:
       - "8080:8080"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/health"]
-      interval: 10s 
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8080/health" ]
+      interval: 10s
       timeout: 5s
       retries: 5
       start_period: 15s
@@ -86,7 +133,86 @@ services:
     ports:
       - "8081:8081"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8081/health"]
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8081/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =========================
+  # RABBITMQ
+  # =========================
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: admin
+      RABBITMQ_DEFAULT_PASS: admin
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =========================
+  # SERVICIO NOTIFICACIONES
+  # =========================
+  notificaciones-service:
+    build: ./Reto3/servicio-notificaciones
+    container_name: notificaciones_api
+    restart: always
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      DB_HOST: notification-db
+      DB_USER: root
+      DB_PASSWORD: rootpassword
+      DB_NAME: notifications
+      DB_PORT: 3306
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      RABBITMQ_EXCHANGE: empleados_exchange
+    ports:
+      - "8084:8084"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8084/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =========================
+  # SERVICIO PERFILES
+  # =========================
+  perfiles-service:
+    build: ./Reto3/gestion-perfiles
+    container_name: perfiles_api
+    restart: always
+    depends_on:
+      perfiles-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      PORT: 8085
+      DB_HOST: perfiles-db
+      DB_PORT: 5432
+      DB_USER: camilo
+      DB_PASSWORD: camilo
+      DB_NAME: perfiles_db
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      RABBITMQ_EXCHANGE: empleados_exchange
+    ports:
+      - "8085:8085"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8085/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -95,3 +221,5 @@ services:
 volumes:
   empleados_data:
   departamentos_data:
+  notifications_data:
+  perfiles_data:

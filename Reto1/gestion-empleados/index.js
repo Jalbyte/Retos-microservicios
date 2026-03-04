@@ -1,4 +1,4 @@
-const express = require('express'); 
+const express = require('express');
 // Cargar variables de entorno
 const app = express();
 app.use(express.json());
@@ -9,6 +9,10 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+// Conectar a RabbitMQ
+const { connectRabbit, publishEvent } = require("./rabbitmq");
+
+connectRabbit();
 
 // CORS middleware
 const swaggerUi = require('swagger-ui-express');
@@ -79,21 +83,21 @@ app.use("/docs", swaggerUi.serve, swaggerUi.setup(specs));
 
 // ─── Helper: estructura de error estandarizada ───────────────────────────────
 const HTTP_TEXTS = {
-    400: 'Bad Request',
-    404: 'Not Found',
-    409: 'Conflict',
-    500: 'Internal Server Error',
+  400: 'Bad Request',
+  404: 'Not Found',
+  409: 'Conflict',
+  500: 'Internal Server Error',
 };
 
 function errorResponse(res, { status, message, path, errors = [] }) {
-    return res.status(status).json({
-        status,
-        error: HTTP_TEXTS[status] ?? 'Error',
-        message,
-        timestamp: new Date().toISOString(),
-        path,
-        errors,
-    });
+  return res.status(status).json({
+    status,
+    error: HTTP_TEXTS[status] ?? 'Error',
+    message,
+    timestamp: new Date().toISOString(),
+    path,
+    errors,
+  });
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -170,117 +174,137 @@ function errorResponse(res, { status, message, path, errors = [] }) {
  */
 app.post('/empleado', async (req, res) => {
 
-    const { nombre, apellido, cargo, email, departamento_id, fechaIngreso } = req.body;
+  const { nombre, apellido, cargo, email, departamento_id, fechaIngreso } = req.body;
 
-    
-    // Validación de campos requeridos
-    
-    const camposRequeridos = { nombre, apellido, cargo, email, departamento_id, fechaIngreso };
+  // Validación de campos requeridos
 
-    const faltantes = Object.entries(camposRequeridos)
-        .filter(([, v]) => v === undefined || v === null || v === '')
-        .map(([field]) => ({
-            field,
-            message: `El campo '${field}' es requerido`,
-            rejectedValue: camposRequeridos[field] ?? null,
-        }));
+  const camposRequeridos = { nombre, apellido, cargo, email, departamento_id, fechaIngreso };
 
-    if (faltantes.length > 0) {
-        return errorResponse(res, {
-            status: 400,
-            message: 'Validation failed',
-            path: '/empleado',
-            errors: faltantes,
-        });
-    }
+  const faltantes = Object.entries(camposRequeridos)
+    .filter(([, v]) => v === undefined || v === null || v === '')
+    .map(([field]) => ({
+      field,
+      message: `El campo '${field}' es requerido`,
+      rejectedValue: camposRequeridos[field] ?? null,
+    }));
 
-    
-    // Validación de fecha
+  if (faltantes.length > 0) {
+    return errorResponse(res, {
+      status: 400,
+      message: 'Validation failed',
+      path: '/empleado',
+      errors: faltantes,
+    });
+  }
 
-    const fecha = new Date(fechaIngreso);
 
-    if (isNaN(fecha.getTime())) {
-        return errorResponse(res, {
-            status: 400,
-            message: 'Fecha inválida',
-            path: '/empleado',
-            errors: [{
-                field: 'fechaIngreso',
-                message: 'Formato de fecha inválido',
-                rejectedValue: fechaIngreso,
-            }],
-        });
-    }
+  // Validación de fecha
+
+  const fecha = new Date(fechaIngreso);
+
+  if (isNaN(fecha.getTime())) {
+    return errorResponse(res, {
+      status: 400,
+      message: 'Fecha inválida',
+      path: '/empleado',
+      errors: [{
+        field: 'fechaIngreso',
+        message: 'Formato de fecha inválido',
+        rejectedValue: fechaIngreso,
+      }],
+    });
+  }
+
+  try {
+
+
+    // Validar departamento con Circuit Breaker
 
     try {
+      await departamentoBreaker.fire(departamento_id);
+    } catch (err) {
 
-        
-        // Validar departamento con Circuit Breaker
-        
-        try {
-            await departamentoBreaker.fire(departamento_id);
-        } catch (err) {
+      console.error("ERROR VALIDANDO DEPARTAMENTO:", err);
 
-            console.error("ERROR VALIDANDO DEPARTAMENTO:", err);
+      return errorResponse(res, {
+        status: 503,
+        message: 'Servicio de departamentos no disponible',
+        path: '/empleado',
+        errors: [{
+          field: 'departamento_id',
+          message: 'No se pudo validar el departamento',
+          rejectedValue: departamento_id,
+        }],
+      });
+    }
 
-            return errorResponse(res, {
-                status: 503,
-                message: 'Servicio de departamentos no disponible',
-                path: '/empleado',
-                errors: [{
-                    field: 'departamento_id',
-                    message: 'No se pudo validar el departamento',
-                    rejectedValue: departamento_id,
-                }],
-            });
-        }
-
-        // 
-        // Insert en base de datos
-        // 
-        const insertQuery = `
+    // 
+    // Insert en base de datos
+    // 
+    const insertQuery = `
             INSERT INTO empleado (nombre, apellido, cargo, email, departamento_id, fecha_ingreso)
             VALUES ($1, $2, $3, $4, $5, $6)
             RETURNING *;
         `;
 
-        const values = [
-            nombre,
-            apellido,
-            cargo,
-            email,
-            departamento_id,
-            fecha
-        ];
+    const values = [
+      nombre,
+      apellido,
+      cargo,
+      email,
+      departamento_id,
+      fecha
+    ];
 
-        const result = await pool.query(insertQuery, values);
+    const result = await pool.query(insertQuery, values);
 
-        return res.status(201).json(result.rows[0]);
+    const empleadoCreado = result.rows[0];
 
-    } catch (error) {
-
-        console.error("ERROR AL CREAR EMPLEADO:", error);
-
-        // Error por email duplicado (constraint UNIQUE)
-        if (error.code === '23505') {
-            return errorResponse(res, {
-                status: 409,
-                message: 'El email ya está registrado',
-                path: '/empleado',
-                errors: [{
-                    field: 'email',
-                    message: 'Ya existe un empleado con este email',
-                    rejectedValue: email,
-                }],
-            });
+    //  Publicar evento en RabbitMQ (NO afecta a la BD si falla)
+    try {
+      await publishEvent({
+        event: "empleado.creado",
+        data: {
+          id: empleadoCreado.id,
+          nombre: empleadoCreado.nombre,
+          email: empleadoCreado.email,
+          departamentoId: empleadoCreado.departamento_id,
+          fechaIngreso: empleadoCreado.fecha_ingreso
         }
+      });
 
-        return errorResponse(res, {
-            status: 500,
-            message: 'Error interno al registrar el empleado',
-            path: '/empleado',
-        });
+      console.log("Evento empleado.creado publicado");
+    } catch (err) {
+      console.error("Error publicando evento:", err);
     }
+
+    // Respuesta normal
+    return res.status(201).json(empleadoCreado);
+
+  } catch (error) {
+
+    console.error("ERROR AL CREAR EMPLEADO:", error);
+
+    // Error por email duplicado (constraint UNIQUE)
+    if (error.code === '23505') {
+      return errorResponse(res, {
+        status: 409,
+        message: 'El email ya está registrado',
+        path: '/empleado',
+        errors: [{
+          field: 'email',
+          message: 'Ya existe un empleado con este email',
+          rejectedValue: email,
+        }],
+      });
+    }
+
+    return errorResponse(res, {
+      status: 500,
+      message: 'Error interno al registrar el empleado',
+      path: '/empleado',
+    });
+  }
 });
 /**
  * @swagger
@@ -419,27 +443,129 @@ app.get('/empleado', async (req, res) => {
  *       500:
  *         description: Error interno del servidor
  */
-app.get('/empleado/:id', async (req, res) => {      
-    const { id } = req.params;
+app.get('/empleado/:id', async (req, res) => {
+  const { id } = req.params;
+  const result = await pool.query(
+    'SELECT * FROM empleado WHERE id = $1',
+    [parseInt(id)]
+  );
+
+  if (result.rows.length > 0) {
+    return res.json(result.rows[0]);
+  }
+
+  return errorResponse(res, {
+    status: 404,
+    message: `El empleado con id ${id} no existe`,
+    path: `/empleado/${id}`,
+    errors: [{
+      field: 'id',
+      message: 'No se encontró ningún empleado con este id',
+      rejectedValue: id,
+    }],
+  });
+});
+
+/**
+ * @swagger
+ * /empleado/{id}:
+ *   delete:
+ *     summary: Eliminar empleado
+ *     description: Elimina un empleado del sistema
+ *     tags:
+ *       - Empleados
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID del empleado
+ *     responses:
+ *       200:
+ *         description: Empleado eliminado exitosamente
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                   example: "Empleado eliminado exitosamente"
+ *                 empleado:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: integer
+ *                     nombre:
+ *                       type: string
+ *                     apellido:
+ *                       type: string
+ *                     cargo:
+ *                       type: string
+ *                     email:
+ *                       type: string
+ *                     departamento_id:
+ *                       type: integer
+ *                     fechaIngreso:
+ *                       type: string
+ *       404:
+ *         description: Empleado no encontrado
+ *       500:
+ *         description: Error interno del servidor
+ */
+app.delete('/empleado/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
     const result = await pool.query(
-        'SELECT * FROM empleado WHERE id = $1',
-        [parseInt(id)]
+      'DELETE FROM empleado WHERE id = $1 RETURNING *',
+      [parseInt(id)]
     );
 
-    if (result.rows.length > 0) {
-    return res.json(result.rows[0]);
-    }
-
-    return errorResponse(res, {
+    if (result.rowCount === 0) {
+      return errorResponse(res, {
         status: 404,
         message: `El empleado con id ${id} no existe`,
         path: `/empleado/${id}`,
         errors: [{
-            field: 'id',
-            message: 'No se encontró ningún empleado con este id',
-            rejectedValue: id,
+          field: 'id',
+          message: 'No se encontró ningún empleado con este id',
+          rejectedValue: id,
         }],
+      });
+    }
+
+    // Publicar evento de eliminación
+    try {
+      await publishEvent({
+        event: "empleado.eliminado",
+        data: {
+          id: result.rows[0].id,
+          nombre: result.rows[0].nombre,
+          apellido: result.rows[0].apellido,
+          cargo: result.rows[0].cargo,
+          email: result.rows[0].email,
+          departamento_id: result.rows[0].departamento_id,
+          fechaIngreso: result.rows[0].fecha_ingreso
+        }
+      });
+      console.log("Evento empleado.eliminado publicado");
+    } catch (err) {
+      console.error("Error publicando evento:", err);
+    }
+
+    return res.json({
+      message: "Empleado eliminado exitosamente",
+      empleado: result.rows[0],
     });
+  } catch (error) {
+    console.error(error);
+    return errorResponse(res, {
+      status: 500,
+      message: 'Error interno al eliminar el empleado',
+      path: `/empleado/${id}`,
+    });
+  }
 });
 
 // Ruta de health check
@@ -454,13 +580,14 @@ app.get('/health', async (req, res) => {
 
 // Ruta 404
 app.use((req, res) => {
-    return errorResponse(res, {
-        status: 404,
-        message: 'Recurso no encontrado',
-        path: req.originalUrl,
-    });
+  return errorResponse(res, {
+    status: 404,
+    message: 'Recurso no encontrado',
+    path: req.originalUrl,
+  });
 });
 
 app.listen(PORT, () => {
   console.log(`Servidor listo en http://localhost:${PORT}`);
 });
+
