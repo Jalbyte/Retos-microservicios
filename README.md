@@ -1,4 +1,5 @@
 # Reto 3 — Sistema de Microservicios con Message Broker
+# Reto 4 — Seguridad y Control de Acceso con JWT
 
 Arquitectura de microservicios desacoplados con comunicación asíncrona vía RabbitMQ. Cada servicio posee su propia base de datos, corre en un contenedor Docker independiente e implementa patrones de resiliencia. Se agrega en el Reto 3 un broker de mensajes que conecta cuatro servicios especializados.
 
@@ -273,3 +274,165 @@ curl -X PUT http://localhost:8085/perfiles/<empleadoId> \
         │   └── service/            # PerfilService
         ├── src/main/resources/application.properties
         └── README.md
+
+---
+
+## Reto 4 — Seguridad y Control de Acceso con JWT
+
+### Nuevos Servicios
+
+| Servicio       | Lenguaje   | Puerto | Base de Datos          | Rol                                               |
+|----------------|------------|--------|------------------------|---------------------------------------------------|
+| auth-service   | Node.js 20 | 3001   | PostgreSQL (5436)      | Autenticación, emisión y validación de JWT, RBAC  |
+
+### Arquitectura de Seguridad
+
+```
+Cliente HTTP
+     │
+     ▼  POST /auth/login → JWT de acceso
+┌─────────────┐
+│ auth-service │  :3001
+│  (Node.js)  │◄── empleado.creado  (RabbitMQ empleados_exchange)
+│             │──► usuario.creado   (RabbitMQ auth_exchange)
+│             │──► usuario.recuperacion (RabbitMQ auth_exchange)
+└──────┬──────┘
+       │ empleado.eliminado → inhabilita usuario
+       │
+       └─► auth_exchange ──► notificaciones.auth.queue
+                                     │
+                                     ▼
+                            notificaciones-service
+                            (simula envío de email con token)
+
+Todos los demás servicios validan el Bearer JWT en CADA petición:
+  empleados-service  (Node.js – jsonwebtoken middleware)
+  departamentos-service (Go – HMAC-SHA256 manual)
+  perfiles-service   (Java – HandlerInterceptor HMAC-SHA256)
+  notificaciones-service (Java – HandlerInterceptor HMAC-SHA256)
+```
+
+### Estrategia de Validación de Token
+
+Se eligió la estrategia **Middleware/Interceptor por Servicio** (opción 2):
+
+- **Por qué**: Evita introducir un nuevo componente de infraestructura (API Gateway) que agregaría latencia adicional y complejidad operacional. Para un sistema académico con pocos servicios, cada servicio valida el JWT directamente usando la misma clave simétrica HMAC-SHA256 inyectada vía variable de entorno.
+- **Clave simétrica compartida**: `JWT_SECRET=super_secret_reto4_jwt_key_2024` (solo para fines académicos — en producción usar clave asimétrica RS256 y compartir la clave pública).
+- Cada lenguaje implementa la validación con sus herramientas nativas: `jsonwebtoken` en Node.js, librería estándar `crypto/hmac` en Go, `javax.crypto.Mac` en Java.
+
+### Tipos de Tokens
+
+| Token          | Algoritmo | Payload clave                            | TTL    | Propósito                             |
+|----------------|-----------|------------------------------------------|--------|---------------------------------------|
+| Access JWT     | HS256     | `{ sub, role, iat, exp }`               | 1 hora | Autenticar peticiones REST            |
+| Reset JWT      | HS256     | `{ sub, type: "RESET_PASSWORD", exp }`  | 1 hora | Establecer/recuperar contraseña       |
+
+### Control de Acceso Basado en Roles (RBAC)
+
+| Método HTTP   | Rol requerido | Ejemplo                          |
+|---------------|---------------|----------------------------------|
+| GET           | USER o ADMIN  | `GET /empleado`, `GET /perfiles` |
+| POST          | ADMIN         | `POST /empleado`                 |
+| PUT / PATCH   | ADMIN         | `PUT /perfiles/:id`              |
+| DELETE        | ADMIN         | `DELETE /empleado/:id`           |
+| Sin token     | —             | → 401 Unauthorized               |
+| Rol insuficiente | —          | → 403 Forbidden                  |
+
+### Cómo obtener un token (flujo completo)
+
+#### 1. Login con el Admin semilla
+
+```bash
+curl -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@empresa.com","password":"password"}'
+```
+
+Respuesta:
+```json
+{ "accessToken": "<jwt>", "tokenType": "Bearer", "expiresIn": 3600 }
+```
+
+#### 2. Usar el token en peticiones protegidas
+
+```bash
+curl http://localhost:8080/empleado \
+  -H "Authorization: Bearer <jwt>"
+```
+
+#### 3. Crear un empleado como Admin (genera usuario automáticamente)
+
+```bash
+curl -X POST http://localhost:8080/empleado \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <jwt-admin>" \
+  -d '{"nombre":"Juan","apellido":"Pérez","cargo":"Dev","email":"juan@empresa.com","departamento_id":1,"fechaIngreso":"2026-03-09T00:00:00Z"}'
+```
+
+→ El `auth-service` detecta `empleado.creado`, crea el usuario inhabilitado, genera un reset token y publica `usuario.creado`.
+→ El `notificaciones-service` imprime en logs el token de activación:
+
+```
+[NOTIFICACIÓN] Tipo: SEGURIDAD | Para: juan@empresa.com | Mensaje: "Para establecer o recuperar su contraseña, utilice el siguiente token: <reset-jwt>..."
+```
+
+#### 4. Establecer contraseña con el reset token
+
+```bash
+curl -X POST http://localhost:3001/auth/reset-password \
+  -H "Content-Type: application/json" \
+  -d '{"token":"<reset-jwt-del-log>","newPassword":"MiPass123"}'
+```
+
+#### 5. Login del nuevo usuario (rol USER)
+
+```bash
+curl -X POST http://localhost:3001/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan@empresa.com","password":"MiPass123"}'
+```
+
+#### 6. Recuperar contraseña olvidada
+
+```bash
+curl -X POST http://localhost:3001/auth/recover-password \
+  -H "Content-Type: application/json" \
+  -d '{"email":"juan@empresa.com"}'
+```
+
+→ Nuevo reset token aparece en los logs de `notificaciones-service`. Repetir paso 4 y 5.
+
+### Secret Key (solo fines académicos)
+
+```
+JWT_SECRET=super_secret_reto4_jwt_key_2024
+```
+
+Definida en `docker-compose.yml` como variable de entorno e inyectada en **todos** los contenedores.
+Ver `.env.example` para configuración local sin Docker.
+
+### Swagger UI (con BearerAuth)
+
+| Servicio               | Swagger UI                                  |
+|------------------------|---------------------------------------------|
+| auth-service           | http://localhost:3001/docs                  |
+| empleados-service      | http://localhost:8080/docs                  |
+| departamentos-service  | http://localhost:8081/swagger/index.html    |
+| notificaciones-service | http://localhost:8084/swagger-ui.html       |
+| perfiles-service       | http://localhost:8085/swagger-ui.html       |
+
+En todos los Swagger UI con BearerAuth: haga clic en **Authorize**, ingrese el JWT del login y pruebe los endpoints directamente.
+
+### Variables de entorno (.env.example)
+
+```env
+# JWT — misma clave en todos los servicios
+JWT_SECRET=super_secret_reto4_jwt_key_2024
+
+# auth-service
+PORT=3001
+DATABASE_URL=postgres://postgres:postgres@localhost:5436/auth_db
+RABBITMQ_URL=amqp://admin:admin@localhost:5672
+RABBITMQ_EXCHANGE=empleados_exchange
+AUTH_EXCHANGE=auth_exchange
+```
