@@ -90,6 +90,29 @@ services:
       start_period: 15s
 
   # =========================
+  # BASE DE DATOS AUTH (Reto 4)
+  # =========================
+  db-auth:
+    image: postgres:15
+    container_name: auth_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: auth_db
+    ports:
+      - "5436:5432"
+    volumes:
+      - auth_data:/var/lib/postgresql/data
+      - ./Reto4/auth-service/init.sql:/docker-entrypoint-initdb.d/init.sql:Z
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d auth_db" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # =========================
   # SERVICIO EMPLEADOS
   # =========================
   empleados-service:
@@ -103,11 +126,14 @@ services:
         condition: service_healthy
       rabbitmq:
         condition: service_healthy
+      auth-service:
+        condition: service_healthy
     environment:
       PORT: 8080
       DATABASE_URL: postgresql://camilo:camilo@database-empleados:5432/empleados_db?schema=public
       DEPARTAMENTOS_URL: http://departamentos-service:8081
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      JWT_SECRET: super_secret_reto4_jwt_key_2024
     ports:
       - "8080:8080"
     healthcheck:
@@ -130,6 +156,7 @@ services:
     environment:
       PORT: 8081
       DATABASE_URL: postgresql://camilo:camilo@database-departamentos:5432/departamentos_db?sslmode=disable
+      JWT_SECRET: super_secret_reto4_jwt_key_2024
     ports:
       - "8081:8081"
     healthcheck:
@@ -179,6 +206,7 @@ services:
       DB_PORT: 3306
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       RABBITMQ_EXCHANGE: empleados_exchange
+      JWT_SECRET: super_secret_reto4_jwt_key_2024
     ports:
       - "8084:8084"
     healthcheck:
@@ -209,10 +237,39 @@ services:
       DB_NAME: perfiles_db
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       RABBITMQ_EXCHANGE: empleados_exchange
+      JWT_SECRET: super_secret_reto4_jwt_key_2024
     ports:
       - "8085:8085"
     healthcheck:
       test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8085/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # =========================
+  # AUTH SERVICE (Reto 4)
+  # =========================
+  auth-service:
+    build: ./Reto4/auth-service
+    container_name: auth_api
+    restart: always
+    depends_on:
+      db-auth:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgres://postgres:postgres@db-auth:5432/auth_db
+      JWT_SECRET: super_secret_reto4_jwt_key_2024
+      RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
+      RABBITMQ_EXCHANGE: empleados_exchange
+      AUTH_EXCHANGE: auth_exchange
+    ports:
+      - "3001:3001"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:3001/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -223,3 +280,4 @@ volumes:
   departamentos_data:
   notifications_data:
   perfiles_data:
+  auth_data:
