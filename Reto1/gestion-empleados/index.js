@@ -1,4 +1,5 @@
 const express = require('express');
+const { authenticate, requireRole } = require('./middleware/auth');
 // Cargar variables de entorno
 const app = express();
 app.use(express.json());
@@ -71,7 +72,18 @@ const options = {
       {
         url: "http://localhost:8080"
       }
-    ]
+    ],
+    components: {
+      securitySchemes: {
+        BearerAuth: {
+          type: "http",
+          scheme: "bearer",
+          bearerFormat: "JWT",
+          description: "JWT obtenido en POST /auth/login del auth-service (puerto 3001)"
+        }
+      }
+    },
+    security: [{ BearerAuth: [] }]
   },
   apis: ["./index.js"],
 };
@@ -177,7 +189,7 @@ function errorResponse(res, { status, message, path, errors = [] }) {
  *       500:
  *         description: Error interno del servidor
  */
-app.post('/empleado', async (req, res) => {
+app.post('/empleado', authenticate, requireRole('ADMIN'), async (req, res) => {
 
   const { nombre, apellido, cargo, email, departamento_id, fechaIngreso } = req.body;
 
@@ -380,7 +392,7 @@ app.post('/empleado', async (req, res) => {
  *       500:
  *         description: Error interno del servidor
  */
-app.get('/empleado', async (req, res) => {
+app.get('/empleado', authenticate, requireRole('ADMIN', 'USER'), async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const size = Math.min(100, Math.max(1, parseInt(req.query.size) || 5));
@@ -458,7 +470,7 @@ app.get('/empleado', async (req, res) => {
  *       500:
  *         description: Error interno del servidor
  */
-app.get('/empleado/:id', async (req, res) => {
+app.get('/empleado/:id', authenticate, requireRole('ADMIN', 'USER'), async (req, res) => {
   const { id } = req.params;
   const result = await pool.query(
     'SELECT * FROM empleado WHERE id = $1 AND is_active = true',
@@ -539,7 +551,7 @@ app.get('/empleado/:id', async (req, res) => {
  *       500:
  *         description: Error interno del servidor
  */
-app.delete('/empleado/:id', async (req, res) => {
+app.delete('/empleado/:id', authenticate, requireRole('ADMIN'), async (req, res) => {
   const { id } = req.params;
   try {
     const result = await pool.query(
