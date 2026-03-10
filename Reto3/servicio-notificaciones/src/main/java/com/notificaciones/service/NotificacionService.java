@@ -34,10 +34,7 @@ public class NotificacionService {
                 .build();
 
         repository.save(notificacion);
-
-        // Simular envío de email con log estructurado
         log.info("[NOTIFICACIÓN] Tipo: BIENVENIDA | Para: {} | Mensaje: \"{}\"", email, mensaje);
-
         return notificacion;
     }
 
@@ -57,10 +54,36 @@ public class NotificacionService {
                 .build();
 
         repository.save(notificacion);
-
-        // Simular envío de email con log estructurado
         log.info("[NOTIFICACIÓN] Tipo: DESVINCULACIÓN | Para: {} | Mensaje: \"{}\"", email, mensaje);
+        return notificacion;
+    }
 
+    /**
+     * Reto 4 – Registra y simula el envío de credenciales de seguridad.
+     * Se dispara cuando el auth-service publica usuario.creado o usuario.recuperacion.
+     *
+     * @param email   Destinatario
+     * @param token   JWT de tipo RESET_PASSWORD generado por auth-service
+     * @param motivo  "CREACION" | "RECUPERACION"
+     */
+    public Notificacion registrarCredencialesSeguridad(String email, String token, String motivo) {
+        String mensaje = String.format(
+                "Para establecer o recuperar su contraseña, utilice el siguiente token: %s " +
+                "(en producción este sería un link: https://app.empresa.com/reset?token=%s )",
+                token, token
+        );
+
+        Notificacion notificacion = Notificacion.builder()
+                .id(UUID.randomUUID().toString())
+                .tipo("SEGURIDAD")
+                .destinatario(email)
+                .mensaje(mensaje)
+                .fechaEnvio(LocalDateTime.now())
+                .empleadoId(email) // no tenemos empleadoId directo, usamos email
+                .build();
+
+        repository.save(notificacion);
+        log.info("[NOTIFICACIÓN] Tipo: SEGURIDAD | Para: {} | Mensaje: \"{}\"", email, mensaje);
         return notificacion;
     }
 

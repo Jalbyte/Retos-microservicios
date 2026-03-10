@@ -57,6 +57,7 @@ public class RabbitMQConfig {
     /**
      * Declares the same fanout exchange used by Reto1 (empleados_exchange, durable).
      */
+    // ─── Exchange de empleados (Reto 1) ───────────────────────────────────────
     @Bean
     public FanoutExchange empleadosExchange() {
         return new FanoutExchange(exchangeName, true, false);
@@ -77,6 +78,25 @@ public class RabbitMQConfig {
     public Binding binding(Queue notificacionesQueue, FanoutExchange empleadosExchange) {
         return BindingBuilder.bind(notificacionesQueue).to(empleadosExchange);
     }
+
+    // ─── Exchange de auth-service (Reto 4) ───────────────────────────────────
+
+    @Bean
+    public FanoutExchange authExchange() {
+        return new FanoutExchange("auth_exchange", true, false);
+    }
+
+    @Bean
+    public Queue notificacionesAuthQueue() {
+        return new Queue("notificaciones.auth.queue", true, false, false);
+    }
+
+    @Bean
+    public Binding authBinding(Queue notificacionesAuthQueue, FanoutExchange authExchange) {
+        return BindingBuilder.bind(notificacionesAuthQueue).to(authExchange);
+    }
+
+    // ─── Listener factory y RabbitTemplate ───────────────────────────────────
 
     /**
      * Listener container factory that uses SimpleMessageConverter.
