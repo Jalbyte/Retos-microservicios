@@ -12,7 +12,7 @@ const app = express();
 app.use(express.json());
 
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_reto4_jwt_key_2024';
+const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_reto4_jwt_key_2026';
 
 // ─── Swagger / OpenAPI ────────────────────────────────────────────────────────
 const swaggerOptions = {

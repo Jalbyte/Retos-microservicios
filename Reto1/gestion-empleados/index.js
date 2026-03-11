@@ -25,10 +25,19 @@ const PORT = process.env.PORT || 8080;
 const DEPARTAMENTOS_URL = process.env.DEPARTAMENTOS_URL;
 const CircuitBreaker = require('opossum');
 
-// Crear instancia axios con timeout
+// Generar token de servicio interno para llamadas entre microservicios
+const jwt = require('jsonwebtoken');
+const SERVICE_TOKEN = jwt.sign(
+  { sub: 'empleados-service', role: 'ADMIN' },
+  process.env.JWT_SECRET || 'super_secret_reto4_jwt_key_2026',
+  { expiresIn: '365d' }
+);
+
+// Crear instancia axios con timeout y token de servicio
 const axiosInstance = axios.create({
   baseURL: DEPARTAMENTOS_URL,
   timeout: 3000, // 3 segundos
+  headers: { Authorization: `Bearer ${SERVICE_TOKEN}` },
 });
 
 

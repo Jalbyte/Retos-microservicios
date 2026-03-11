@@ -23,7 +23,7 @@ import java.util.Map;
 @Component
 public class JwtAuthInterceptor implements HandlerInterceptor {
 
-    @Value("${jwt.secret:super_secret_reto4_jwt_key_2024}")
+    @Value("${jwt.secret:super_secret_reto4_jwt_key_2026}")
     private String jwtSecret;
 
     private final ObjectMapper objectMapper = new ObjectMapper();

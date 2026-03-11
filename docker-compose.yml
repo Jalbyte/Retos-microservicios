@@ -133,7 +133,7 @@ services:
       DATABASE_URL: postgresql://camilo:camilo@database-empleados:5432/empleados_db?schema=public
       DEPARTAMENTOS_URL: http://departamentos-service:8081
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
-      JWT_SECRET: super_secret_reto4_jwt_key_2024
+      JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:
       - "8080:8080"
     healthcheck:
@@ -156,7 +156,7 @@ services:
     environment:
       PORT: 8081
       DATABASE_URL: postgresql://camilo:camilo@database-departamentos:5432/departamentos_db?sslmode=disable
-      JWT_SECRET: super_secret_reto4_jwt_key_2024
+      JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:
       - "8081:8081"
     healthcheck:
@@ -206,7 +206,7 @@ services:
       DB_PORT: 3306
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       RABBITMQ_EXCHANGE: empleados_exchange
-      JWT_SECRET: super_secret_reto4_jwt_key_2024
+      JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:
       - "8084:8084"
     healthcheck:
@@ -237,7 +237,7 @@ services:
       DB_NAME: perfiles_db
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       RABBITMQ_EXCHANGE: empleados_exchange
-      JWT_SECRET: super_secret_reto4_jwt_key_2024
+      JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:
       - "8085:8085"
     healthcheck:
@@ -262,7 +262,7 @@ services:
     environment:
       PORT: 3001
       DATABASE_URL: postgres://postgres:postgres@db-auth:5432/auth_db
-      JWT_SECRET: super_secret_reto4_jwt_key_2024
+      JWT_SECRET: super_secret_reto4_jwt_key_2026
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       RABBITMQ_EXCHANGE: empleados_exchange
       AUTH_EXCHANGE: auth_exchange

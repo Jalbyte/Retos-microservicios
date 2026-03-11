@@ -252,7 +252,7 @@ VALUES (
 ```env
 PORT=3001
 DATABASE_URL=postgres://postgres:postgres@db-auth:5432/auth_db
-JWT_SECRET=super_secret_reto4_jwt_key_2024
+JWT_SECRET=super_secret_reto4_jwt_key_2026
 RABBITMQ_URL=amqp://admin:admin@rabbitmq:5672
 RABBITMQ_EXCHANGE=empleados_exchange
 AUTH_EXCHANGE=auth_exchange
@@ -271,7 +271,7 @@ docker build -t auth_api .
 docker run -p 3001:3001 \
   -e PORT=3001 \
   -e DATABASE_URL="postgres://postgres:postgres@localhost:5436/auth_db" \
-  -e JWT_SECRET="super_secret_reto4_jwt_key_2024" \
+  -e JWT_SECRET="super_secret_reto4_jwt_key_2026" \
   -e RABBITMQ_URL="amqp://admin:admin@localhost:5672" \
   -e RABBITMQ_EXCHANGE="empleados_exchange" \
   -e AUTH_EXCHANGE="auth_exchange" \
