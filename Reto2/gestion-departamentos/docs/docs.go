@@ -233,6 +233,19 @@ const docTemplate = `{
                 }
             }
         }
+    },
+    "security": [
+        {
+            "BearerToken": []
+        }
+    ],
+    "securityDefinitions": {
+        "BearerToken": {
+            "type": "apiKey",
+            "description": "Token JWT. Formato: 'Bearer {token}'",
+            "name": "Authorization",
+            "in": "header"
+        }
     }
 }`
 

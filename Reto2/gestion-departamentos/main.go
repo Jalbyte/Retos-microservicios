@@ -6,6 +6,10 @@ package main
 // @host localhost:8081
 // @schemes http
 // @BasePath /
+// @securityDefinitions.apikey BearerToken
+// @in header
+// @name Authorization
+// @description Token JWT. Formato: 'Bearer {token}'
 
 import (
 	"crypto/hmac"
@@ -124,13 +128,17 @@ func parseJWT(tokenStr, secret string) (*jwtClaims, error) {
 // JWTMiddleware valida el Bearer token en el header Authorization.
 func JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if c.Request.URL.Path == "/health" {
+		path := c.Request.URL.Path
+		if path == "/health" ||
+			strings.HasPrefix(path, "/swagger/") ||
+			path == "/swagger" {
 			c.Next()
 			return
 		}
 
 		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+		log.Printf("DEBUG Authorization header: '%s'", authHeader)
+		if authHeader == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"status":    401,
 				"error":     "Unauthorized",
@@ -141,7 +149,12 @@ func JWTMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+		// Eliminar todos los prefijos "Bearer " que pueda enviar Swagger
+		tokenStr := authHeader
+		for strings.HasPrefix(strings.ToLower(tokenStr), "bearer ") {
+			tokenStr = strings.TrimSpace(tokenStr[7:])
+		}
+
 		secret := os.Getenv("JWT_SECRET")
 
 		claims, err := parseJWT(tokenStr, secret)
@@ -273,6 +286,7 @@ func main() {
 	r.Use(JWTMiddleware()) // Add JWT middleware
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
 		ginSwagger.URL("/swagger/doc.json"),
+		ginSwagger.PersistAuthorization(true),
 	))
 	r.POST("/departamentos", CreateDepartamento)
 	r.GET("/departamentos", GetDepartamentos)
@@ -323,6 +337,7 @@ func DBMiddleware() gin.HandlerFunc {
 // @Summary Crear departamento
 // @Description Registra un nuevo departamento
 // @Tags Departamentos
+// @Security BearerToken
 // @Accept json
 // @Produce json
 // @Param departamento body Departamento true "Departamento"
@@ -375,6 +390,7 @@ func CreateDepartamento(c *gin.Context) {
 // @Summary Listar departamentos
 // @Description Obtiene todos los departamentos con paginación
 // @Tags Departamentos
+// @Security BearerToken
 // @Produce json
 // @Param page query int false "Número de página" default(1)
 // @Param size query int false "Tamaño de página" default(5)
@@ -442,6 +458,7 @@ func GetDepartamentos(c *gin.Context) {
 // @Summary Obtener departamento por ID
 // @Description Obtiene un departamento específico por su ID
 // @Tags Departamentos
+// @Security BearerToken
 // @Produce json
 // @Param id path string true "ID del departamento"
 // @Success 200 {object} Departamento

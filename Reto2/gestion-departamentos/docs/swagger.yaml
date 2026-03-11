@@ -151,4 +151,12 @@ paths:
       - Departamentos
 schemes:
 - http
+security:
+- BearerToken: []
+securityDefinitions:
+  BearerToken:
+    description: 'Token JWT. Formato: ''Bearer {token}'''
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
