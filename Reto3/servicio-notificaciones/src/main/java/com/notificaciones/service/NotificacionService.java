@@ -68,9 +68,8 @@ public class NotificacionService {
      */
     public Notificacion registrarCredencialesSeguridad(String email, String token, String motivo) {
         String mensaje = String.format(
-                "Para establecer o recuperar su contraseña, utilice el siguiente token: %s " +
-                "(en producción este sería un link: https://app.empresa.com/reset?token=%s )",
-                token, token
+                "Para establecer o recuperar su contraseña, utilice el siguiente token: %s",
+                token
         );
 
         Notificacion notificacion = Notificacion.builder()
