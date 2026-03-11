@@ -1,5 +1,4 @@
-# Reto 3 — Sistema de Microservicios con Message Broker
-# Reto 4 — Seguridad y Control de Acceso con JWT
+# Retos implementados usando arquitectura de microservicios
 
 Arquitectura de microservicios desacoplados con comunicación asíncrona vía RabbitMQ. Cada servicio posee su propia base de datos, corre en un contenedor Docker independiente e implementa patrones de resiliencia. Se agrega en el Reto 3 un broker de mensajes que conecta cuatro servicios especializados.
 
@@ -314,11 +313,32 @@ Todos los demás servicios validan el Bearer JWT en CADA petición:
 
 ### Estrategia de Validación de Token
 
-Se eligió la estrategia **Middleware/Interceptor por Servicio** (opción 2):
+#### Opción A: API Gateway centralizado
 
-- **Por qué**: Evita introducir un nuevo componente de infraestructura (API Gateway) que agregaría latencia adicional y complejidad operacional. Para un sistema académico con pocos servicios, cada servicio valida el JWT directamente usando la misma clave simétrica HMAC-SHA256 inyectada vía variable de entorno.
-- **Clave simétrica compartida**: `JWT_SECRET=super_secret_reto4_jwt_key_2024` (solo para fines académicos — en producción usar clave asimétrica RS256 y compartir la clave pública).
-- Cada lenguaje implementa la validación con sus herramientas nativas: `jsonwebtoken` en Node.js, librería estándar `crypto/hmac` en Go, `javax.crypto.Mac` en Java.
+Un único componente (p. ej. Kong, Nginx, AWS API Gateway) intercepta todas las peticiones, valida el JWT y las reenvía al servicio destino solo si son válidas.
+
+| Ventajas | Desventajas |
+|----------|-------------|
+| Lógica de seguridad en un solo lugar | Punto único de fallo |
+| Los microservicios quedan sin lógica de auth | Mayor latencia (hop extra) |
+| Fácil de cambiar algoritmo/clave | Nuevo componente de infraestructura a operar |
+
+#### Opción B: Middleware/Interceptor por servicio *Elegida*
+
+Cada microservicio incorpora su propio middleware que valida el JWT con la clave compartida antes de procesar la petición.
+
+| Ventajas | Desventajas |
+|----------|-------------|
+| Sin componente extra de infraestructura | La clave simétrica debe distribuirse a todos los servicios |
+| Latencia mínima (validación local) | Lógica de validación replicada (aunque trivial con libs nativas) |
+| Independencia total entre servicios | Cambio de clave requiere redespliegue de todos los servicios |
+
+**Justificación de la elección:** Para un sistema académico con cinco servicios bien delimitados, introducir un API Gateway añadiría complejidad operacional sin beneficio proporcional. La validación local es inmediata, cada servicio sigue siendo autónomo y el cambio de estrategia (a RS256 asimétrico, por ejemplo) solo requiere actualizar la función de verificación en cada servicio sin modificar la arquitectura.
+
+Cada lenguaje usa sus herramientas nativas:
+- **Node.js** → `jsonwebtoken` (`jwt.verify`)
+- **Go** → `github.com/golang-jwt/jwt/v4`
+- **Java** → `javax.crypto.Mac` con `HmacSHA256`
 
 ### Tipos de Tokens
 
@@ -338,7 +358,46 @@ Se eligió la estrategia **Middleware/Interceptor por Servicio** (opción 2):
 | Sin token     | —             | → 401 Unauthorized               |
 | Rol insuficiente | —          | → 403 Forbidden                  |
 
-### Cómo obtener un token (flujo completo)
+### Pruebas con Postman / Bruno
+
+Importar la siguiente configuración como **Environment** en Postman o Bruno:
+
+```
+Variable         | Valor inicial
+-----------------|--------------------------------
+base_auth        | http://localhost:3001
+base_empleados   | http://localhost:8080
+base_departamentos | http://localhost:8081
+base_notificaciones | http://localhost:8084
+base_perfiles    | http://localhost:8085
+token            | (vacío — se llena tras el login)
+reset_token      | (vacío — se llena con el log de notificaciones)
+```
+
+**Requests de colección sugeridos:**
+
+| # | Nombre | Método | URL | Body / Header |
+|---|--------|--------|-----|---------------|
+| 1 | Login Admin | POST | `{{base_auth}}/auth/login` | `{"email":"admin@empresa.com","password":"password"}` |
+| 2 | Crear Departamento | POST | `{{base_departamentos}}/departamentos` | Auth: `Bearer {{token}}` + body |
+| 3 | Crear Empleado | POST | `{{base_empleados}}/empleado` | Auth: `Bearer {{token}}` + body |
+| 4 | Establecer Contraseña | POST | `{{base_auth}}/auth/reset-password` | `{"token":"{{reset_token}}","newPassword":"MiPass123"}` |
+| 5 | Login USER | POST | `{{base_auth}}/auth/login` | `{"email":"juan@empresa.com","password":"MiPass123"}` |
+| 6 | GET Empleados (autenticado) | GET | `{{base_empleados}}/empleado` | Auth: `Bearer {{token}}` |
+| 7 | GET Empleados (sin token) | GET | `{{base_empleados}}/empleado` | — (debe retornar 401) |
+| 8 | DELETE Empleado (USER → 403) | DELETE | `{{base_empleados}}/empleado/{{id}}` | Auth: `Bearer {{token}}` de USER |
+| 9 | Recuperar Contraseña | POST | `{{base_auth}}/auth/recover-password` | `{"email":"juan@empresa.com"}` |
+| 10 | DELETE Empleado (ADMIN → 200) | DELETE | `{{base_empleados}}/empleado/{{id}}` | Auth: `Bearer {{token}}` de ADMIN |
+
+> **Tip Postman:** En el request de Login (paso 1 y 5) agregar un script **Tests** para guardar el token automáticamente:
+> ```js
+> const { accessToken } = pm.response.json();
+> pm.environment.set("token", accessToken);
+> ```
+
+---
+
+### Cómo obtener un token (flujo completo — curl)
 
 #### 1. Login con el Admin semilla
 
@@ -402,14 +461,19 @@ curl -X POST http://localhost:3001/auth/recover-password \
 
 → Nuevo reset token aparece en los logs de `notificaciones-service`. Repetir paso 4 y 5.
 
-### Secret Key (solo fines académicos)
+### Secret Key JWT
 
 ```
-JWT_SECRET=super_secret_reto4_jwt_key_2024
+JWT_SECRET=super_secret_reto4_jwt_key_2026
 ```
 
-Definida en `docker-compose.yml` como variable de entorno e inyectada en **todos** los contenedores.
-Ver `.env.example` para configuración local sin Docker.
+> Esta clave simétrica se incluye aquí **únicamente por propósitos académicos**. En un entorno productivo se debe usar el algoritmo **RS256** (asimétrico): la clave privada solo la conoce el `auth-service` para firmar; los demás servicios usan la clave pública para verificar. Así, comprometer un microservicio consumidor no expone la capacidad de emitir tokens.
+
+Definida en `docker-compose.yml` como variable de entorno e inyectada en **todos** los contenedores. Para ejecución local sin Docker, copiar `.env.example` a `.env`:
+
+```bash
+cp .env.example .env
+```
 
 ### Swagger UI (con BearerAuth)
 
@@ -425,9 +489,11 @@ En todos los Swagger UI con BearerAuth: haga clic en **Authorize**, ingrese el J
 
 ### Variables de entorno (.env.example)
 
+El archivo `.env.example` en la raíz del proyecto contiene todas las variables necesarias para ejecutar los servicios localmente sin Docker. Las variables más relevantes para la seguridad son:
+
 ```env
-# JWT — misma clave en todos los servicios
-JWT_SECRET=super_secret_reto4_jwt_key_2024
+#  Solo para fines académicos — ver nota en sección "Secret Key JWT"
+JWT_SECRET=super_secret_reto4_jwt_key_2026
 
 # auth-service
 PORT=3001
@@ -436,3 +502,5 @@ RABBITMQ_URL=amqp://admin:admin@localhost:5672
 RABBITMQ_EXCHANGE=empleados_exchange
 AUTH_EXCHANGE=auth_exchange
 ```
+
+Ver `.env.example` para el listado completo de variables de todos los servicios.
