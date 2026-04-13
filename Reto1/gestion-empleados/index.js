@@ -1,9 +1,10 @@
 const express = require('express');
 const { authenticate, requireRole } = require('./middleware/auth');
+const cors = require('cors');
 // Cargar variables de entorno
 const app = express();
 app.use(express.json());
-
+app.use(cors());
 const { Pool } = require('pg');
 
 const pool = new Pool({
@@ -79,7 +80,7 @@ const options = {
     },
     servers: [
       {
-        url: "http://localhost:8080"
+        url: "http://localhost:3000"
       }
     ],
     components: {
