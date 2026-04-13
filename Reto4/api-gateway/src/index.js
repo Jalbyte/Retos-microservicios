@@ -41,13 +41,7 @@ app.use(
   })
 );
 
-app.use(
-  '/docs',
-  createProxyMiddleware({
-    target: 'http://auth-service:3001',
-    changeOrigin: true,
-  })
-);  
+
 
 // Empleados
 app.use(
@@ -61,30 +55,66 @@ app.use(
   })
 );
 
-// Departamentos
+//Departamentos
+// 1. HTML principal
 app.use(
-  ['/docs/departamentos', '/docs/departamentos/*'],
+  '/docs/departamentos',
   createProxyMiddleware({
     target: 'http://departamentos-service:8081',
     changeOrigin: true,
     pathRewrite: {
-      '^/docs/departamentos': '/swagger',
+      '^/docs/departamentos$': '/swagger/index.html',
     },
   })
 );
 
-// Perfiles
+// 2. Assets (JS, CSS, json)
 app.use(
-  ['/docs/perfiles', '/docs/perfiles/*'],
+  '/docs/departamentos/',
+  createProxyMiddleware({
+    target: 'http://departamentos-service:8081',
+    changeOrigin: true,
+    pathRewrite: {
+      '^/docs/departamentos/': '/swagger/',
+    },
+  })
+);
+// Perfiles
+// 1. HTML principal
+app.use(
+  '/docs/perfiles',
   createProxyMiddleware({
     target: 'http://perfiles-service:8085',
     changeOrigin: true,
     pathRewrite: {
-      '^/docs/perfiles': '/swagger-ui.html',
+      '^/docs/perfiles$': '/swagger-ui.html',
     },
   })
 );
 
+// 2. Assets (JS, CSS, etc)
+app.use(
+  '/docs/perfiles/',
+  createProxyMiddleware({
+    target: 'http://perfiles-service:8085',
+    changeOrigin: true,
+    pathRewrite: {
+      '^/docs/perfiles/': '/swagger-ui/',
+    },
+  })
+);
+
+// 3. OpenAPI JSON
+app.use(
+  '/docs/perfiles/v3/api-docs',
+  createProxyMiddleware({
+    target: 'http://perfiles-service:8085',
+    changeOrigin: true,
+    pathRewrite: {
+      '^/docs/perfiles/v3/api-docs': '/v3/api-docs',
+    },
+  })
+);
 // Notificaciones
 app.use(
   ['/docs/notificaciones', '/docs/notificaciones/*'],
