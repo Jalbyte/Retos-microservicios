@@ -4,12 +4,14 @@ const jwt = require('jsonwebtoken');
 const { v4: uuidv4 } = require('uuid');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
+const cors = require('cors');
 
 const pool = require('./db');
 const { connectRabbit, publishToAuth, setEventHandler } = require('./rabbitmq');
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_reto4_jwt_key_2026';
@@ -31,7 +33,7 @@ const swaggerOptions = {
 
 **Usuario semilla (ADMIN):** \`admin@empresa.com\` / \`password\``,
     },
-    servers: [{ url: `http://localhost:${PORT}` }],
+    servers: [{ url: `http://localhost:3000` }],
     components: {
       securitySchemes: {
         BearerAuth: {
