@@ -34,6 +34,18 @@ Then('eventualmente debe existir una notificación de tipo DESVINCULACION para e
 
 Given('que el empleado ha sido desvinculado', async function () {
     await this.eliminoAlEmpleadoExistente();
+    // Esperar a que el evento llegue al auth-service y deshabilite al usuario
+    await poll(async () => {
+        try {
+            const res = await axios.post(`${BASE_URL}/auth/login`, {
+                email: this.offboardEmail,
+                password: this.offboardPassword
+            });
+            return res.status === 401;
+        } catch (error) {
+            return error.response && error.response.status === 401;
+        }
+    }, MAX_ATTEMPTS, INTERVAL_MS);
 });
 
 When('intento hacer login con sus credenciales', async function () {

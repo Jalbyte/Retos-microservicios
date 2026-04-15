@@ -25,10 +25,7 @@ Then('la respuesta debe tener código {int} o {int}', function (codigo1, codigo2
     expect([codigo1, codigo2]).to.include(this.lastResponse.status);
 });
 
-// CORRECCIÓN: step undefined que faltaba implementar
+
 Then('el gateway devuelve {int} si no hay ruta, pero confirma que está vivo', function (codigo) {
-    // Este paso es semántico: solo confirma que la respuesta ya verificada
-    // en el paso anterior corresponde al comportamiento esperado del gateway.
-    // No necesita hacer una nueva petición.
     expect(this.lastResponse.status).to.equal(codigo);
 });

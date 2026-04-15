@@ -1,5 +1,382 @@
 [
   {
+    "description": "  Para confirmar que el sistema está operativo\n  Como suite de pruebas\n  Quiero verificar que el API Gateway responde",
+    "elements": [
+      {
+        "description": "",
+        "id": "verificación-del-sistema;el-sistema-responde-correctamente",
+        "keyword": "Escenario",
+        "line": 8,
+        "name": "El sistema responde correctamente",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 337999
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que el sistema está desplegado y operativo",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:8"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 312000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 10,
+            "name": "consulto la URL base",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 5138199
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 11,
+            "name": "la respuesta debe tener código 404",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1113800
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Y ",
+            "line": 12,
+            "name": "el gateway devuelve 404 si no hay ruta, pero confirma que está vivo",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:29"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 237699
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      }
+    ],
+    "id": "verificación-del-sistema",
+    "line": 3,
+    "keyword": "Característica",
+    "name": "Verificación del sistema",
+    "tags": [],
+    "uri": "features\\01_smoke.feature"
+  },
+  {
+    "description": "  Como sistema de autenticación\n  Quiero controlar el acceso a los recursos\n  Para garantizar que solo los usuarios autorizados realicen operaciones",
+    "elements": [
+      {
+        "description": "",
+        "id": "seguridad-y-control-de-acceso;acceso-denegado-sin-token-de-autenticación",
+        "keyword": "Escenario",
+        "line": 11,
+        "name": "Acceso denegado sin token de autenticación",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 38900
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que el sistema está desplegado y operativo",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:8"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 150000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 12,
+            "name": "consulto la lista de empleados sin token",
+            "match": {
+              "location": "step_definitions\\security.steps.js:19"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 5860899
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 13,
+            "name": "la respuesta debe tener código 401",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 172199
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "seguridad-y-control-de-acceso;acceso-denegado-con-token-inválido",
+        "keyword": "Escenario",
+        "line": 15,
+        "name": "Acceso denegado con token inválido",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 36799
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que el sistema está desplegado y operativo",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:8"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 162799
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 16,
+            "name": "consulto la lista de empleados con token inválido \"token.falso.123\"",
+            "match": {
+              "location": "step_definitions\\security.steps.js:27"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3915600
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 17,
+            "name": "la respuesta debe tener código 401",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 147600
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "seguridad-y-control-de-acceso;usuario-user-puede-consultar-empleados-pero-no-puede-crear",
+        "keyword": "Escenario",
+        "line": 19,
+        "name": "Usuario USER puede consultar empleados pero no puede crear",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 17899
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que el sistema está desplegado y operativo",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:8"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 85700
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 20,
+            "name": "que estoy autenticado como \"USER\"",
+            "match": {
+              "location": "step_definitions\\security.steps.js:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 111194799
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 21,
+            "name": "consulto la lista de empleados",
+            "match": {
+              "location": "step_definitions\\security.steps.js:37"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 22556400
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 22,
+            "name": "la respuesta debe tener código 200",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 134000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 23,
+            "name": "intento crear un empleado con datos válidos",
+            "match": {
+              "location": "step_definitions\\security.steps.js:47"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 11489299
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 24,
+            "name": "la respuesta debe tener código 403",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 116999
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "seguridad-y-control-de-acceso;usuario-admin-puede-crear-un-empleado",
+        "keyword": "Escenario",
+        "line": 26,
+        "name": "Usuario ADMIN puede crear un empleado",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 25499
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que el sistema está desplegado y operativo",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:8"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 192599
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 27,
+            "name": "que estoy autenticado como \"ADMIN\"",
+            "match": {
+              "location": "step_definitions\\security.steps.js:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 119030599
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 28,
+            "name": "creo un empleado con datos válidos",
+            "match": {
+              "location": "step_definitions\\security.steps.js:51"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 24941199
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 29,
+            "name": "la respuesta debe tener código 201",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 144600
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      }
+    ],
+    "id": "seguridad-y-control-de-acceso",
+    "line": 3,
+    "keyword": "Característica",
+    "name": "Seguridad y control de acceso",
+    "tags": [],
+    "uri": "features\\02_security.feature"
+  },
+  {
     "description": "  Como administrador\n  Quiero registrar nuevos empleados\n  Para que el sistema genere automáticamente sus credenciales y notificaciones",
     "elements": [
       {
@@ -14,7 +391,7 @@
             "hidden": true,
             "result": {
               "status": "passed",
-              "duration": 383700
+              "duration": 21999
             }
           },
           {
@@ -23,11 +400,11 @@
             "line": 9,
             "name": "que estoy autenticado como \"ADMIN\"",
             "match": {
-              "location": "step_definitions\\security.steps.js:15"
+              "location": "step_definitions\\security.steps.js:14"
             },
             "result": {
               "status": "passed",
-              "duration": 128045799
+              "duration": 126437500
             }
           },
           {
@@ -40,7 +417,7 @@
             },
             "result": {
               "status": "passed",
-              "duration": 36851300
+              "duration": 20784400
             }
           },
           {
@@ -53,7 +430,7 @@
             },
             "result": {
               "status": "passed",
-              "duration": 1293799
+              "duration": 134099
             }
           },
           {
@@ -66,7 +443,7 @@
             },
             "result": {
               "status": "passed",
-              "duration": 2120577699
+              "duration": 2122313599
             }
           },
           {
@@ -79,7 +456,7 @@
             },
             "result": {
               "status": "passed",
-              "duration": 53473200
+              "duration": 33045200
             }
           }
         ],
@@ -98,7 +475,7 @@
             "hidden": true,
             "result": {
               "status": "passed",
-              "duration": 47599
+              "duration": 34099
             }
           },
           {
@@ -107,11 +484,11 @@
             "line": 9,
             "name": "que estoy autenticado como \"ADMIN\"",
             "match": {
-              "location": "step_definitions\\security.steps.js:15"
+              "location": "step_definitions\\security.steps.js:14"
             },
             "result": {
               "status": "passed",
-              "duration": 117308000
+              "duration": 107370100
             }
           },
           {
@@ -124,7 +501,7 @@
             },
             "result": {
               "status": "passed",
-              "duration": 23321399
+              "duration": 19982700
             }
           },
           {
@@ -137,7 +514,7 @@
             },
             "result": {
               "status": "passed",
-              "duration": 179854600
+              "duration": 195627999
             }
           },
           {
@@ -150,7 +527,7 @@
             },
             "result": {
               "status": "passed",
-              "duration": 185699
+              "duration": 146600
             }
           },
           {
@@ -163,7 +540,7 @@
             },
             "result": {
               "status": "passed",
-              "duration": 111170299
+              "duration": 107278699
             }
           },
           {
@@ -176,7 +553,7 @@
             },
             "result": {
               "status": "passed",
-              "duration": 700100
+              "duration": 847799
             }
           }
         ],
@@ -195,7 +572,7 @@
             "hidden": true,
             "result": {
               "status": "passed",
-              "duration": 36399
+              "duration": 30900
             }
           },
           {
@@ -204,11 +581,11 @@
             "line": 9,
             "name": "que estoy autenticado como \"ADMIN\"",
             "match": {
-              "location": "step_definitions\\security.steps.js:15"
+              "location": "step_definitions\\security.steps.js:14"
             },
             "result": {
               "status": "passed",
-              "duration": 107280899
+              "duration": 166048099
             }
           },
           {
@@ -221,7 +598,7 @@
             },
             "result": {
               "status": "passed",
-              "duration": 3539406600
+              "duration": 17566799
             }
           },
           {
@@ -233,9 +610,8 @@
               "location": "step_definitions\\smoke.steps.js:20"
             },
             "result": {
-              "status": "failed",
-              "duration": 1475200,
-              "error_message": "AssertionError\n    + expected - actual\n\n    -503\n    +400\n\n    at CustomWorld.<anonymous> (C:\\Users\\Jhony\\Documents\\GitHub\\Retos-microservicios\\Reto5\\e2e-tests\\step_definitions\\smoke.steps.js:21:41)"
+              "status": "passed",
+              "duration": 277800
             }
           },
           {
@@ -247,8 +623,8 @@
               "location": "step_definitions\\onboarding.steps.js:72"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 13607899
             }
           },
           {
@@ -260,8 +636,8 @@
               "location": "step_definitions\\smoke.steps.js:20"
             },
             "result": {
-              "status": "skipped",
-              "duration": 0
+              "status": "passed",
+              "duration": 109599
             }
           }
         ],
@@ -274,6 +650,269 @@
     "keyword": "Característica",
     "name": "Onboarding de empleados",
     "tags": [],
-    "uri": "features\\onboarding.feature"
+    "uri": "features\\03_onboarding.feature"
+  },
+  {
+    "description": "  Como administrador\n  Quiero desvincular empleados\n  Para que el sistema los inhabilite y notifique",
+    "elements": [
+      {
+        "description": "",
+        "id": "offboarding-de-empleados;desvinculación-completa",
+        "keyword": "Escenario",
+        "line": 12,
+        "name": "Desvinculación completa",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 22600
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que estoy autenticado como \"ADMIN\"",
+            "match": {
+              "location": "step_definitions\\security.steps.js:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 118850999
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Y ",
+            "line": 10,
+            "name": "que existe un empleado activo con credenciales configuradas",
+            "match": {
+              "location": "step_definitions\\offboarding.steps.js:10"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2220539399
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 13,
+            "name": "elimino al empleado existente",
+            "match": {
+              "location": "step_definitions\\offboarding.steps.js:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 16582000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 14,
+            "name": "la respuesta debe tener código 200",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 120200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Y ",
+            "line": 15,
+            "name": "eventualmente debe existir una notificación de tipo DESVINCULACION para ese email",
+            "match": {
+              "location": "step_definitions\\offboarding.steps.js:24"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2065644499
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "offboarding-de-empleados;el-empleado-desvinculado-no-puede-hacer-login",
+        "keyword": "Escenario",
+        "line": 17,
+        "name": "El empleado desvinculado no puede hacer login",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 43700
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que estoy autenticado como \"ADMIN\"",
+            "match": {
+              "location": "step_definitions\\security.steps.js:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 117234499
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Y ",
+            "line": 10,
+            "name": "que existe un empleado activo con credenciales configuradas",
+            "match": {
+              "location": "step_definitions\\offboarding.steps.js:10"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2292694399
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 18,
+            "name": "que el empleado ha sido desvinculado",
+            "match": {
+              "location": "step_definitions\\offboarding.steps.js:35"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 59352399
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 19,
+            "name": "intento hacer login con sus credenciales",
+            "match": {
+              "location": "step_definitions\\offboarding.steps.js:51"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 37162299
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 20,
+            "name": "la respuesta debe tener código 401",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 224799
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "offboarding-de-empleados;la-recuperación-de-contraseña-falla-para-un-empleado-desvinculado",
+        "keyword": "Escenario",
+        "line": 22,
+        "name": "La recuperación de contraseña falla para un empleado desvinculado",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 45200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que estoy autenticado como \"ADMIN\"",
+            "match": {
+              "location": "step_definitions\\security.steps.js:14"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 162499699
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Y ",
+            "line": 10,
+            "name": "que existe un empleado activo con credenciales configuradas",
+            "match": {
+              "location": "step_definitions\\offboarding.steps.js:10"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2307339200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 23,
+            "name": "que el empleado ha sido desvinculado",
+            "match": {
+              "location": "step_definitions\\offboarding.steps.js:35"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 33265300
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 24,
+            "name": "solicito recuperar contraseña para su email",
+            "match": {
+              "location": "step_definitions\\offboarding.steps.js:62"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 14916699
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 25,
+            "name": "la respuesta debe tener código 200",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 105499
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      }
+    ],
+    "id": "offboarding-de-empleados",
+    "line": 3,
+    "keyword": "Característica",
+    "name": "Offboarding de empleados",
+    "tags": [],
+    "uri": "features\\04_offboarding.feature"
   }
 ]

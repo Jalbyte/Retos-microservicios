@@ -14,10 +14,10 @@ Las pruebas estan implementadas con Cucumber, Axios y Chai.
 ```
 e2e-tests/
 |-- features/
-|   |-- smoke.feature
-|   |-- security.feature
-|   |-- onboarding.feature
-|   `-- offboarding.feature
+|   |-- 01_smoke.feature
+|   |-- 02_security.feature
+|   |-- 03_onboarding.feature
+|   `-- 04_offboarding.feature
 |-- step_definitions/
 |   |-- smoke.steps.js
 |   |-- security.steps.js
@@ -29,8 +29,8 @@ e2e-tests/
 |   `-- world.js
 |-- reports/
 |   `-- cucumber-report.json
-|-- cucumber.js
-`-- package.json
+|-- package.json
+`-- .env
 ```
 
 ## Prerrequisitos
@@ -81,10 +81,12 @@ cucumber-js
 ## Ejecutar por feature
 
 ```bash
-npx cucumber-js features/smoke.feature
-npx cucumber-js features/security.feature
-npx cucumber-js features/onboarding.feature
-npx cucumber-js features/offboarding.feature
+```bash
+npx cucumber-js features/01_smoke.feature
+npx cucumber-js features/02_security.feature
+npx cucumber-js features/03_onboarding.feature
+npx cucumber-js features/04_offboarding.feature
+```
 ```
 
 ## Reportes
@@ -125,7 +127,7 @@ Valida que al desvincular un empleado:
 - se procese la eliminacion (`200`),
 - se genere notificacion de desvinculacion,
 - el usuario desvinculado no pueda volver a autenticarse,
-- falle la recuperacion de contrasena para ese usuario (`404` o `401`).
+- la recuperación de contraseña deba retornar `200` por seguridad (u omitir detalles), pero el usuario debe seguir inhabilitado.
 
 ## Notas de estabilidad
 

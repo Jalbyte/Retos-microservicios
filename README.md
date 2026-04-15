@@ -504,3 +504,33 @@ AUTH_EXCHANGE=auth_exchange
 ```
 
 Ver `.env.example` para el listado completo de variables de todos los servicios.
+
+---
+
+## Reto 5 — Pruebas End-to-End (E2E) con Cucumber
+
+### Propósito
+
+Validar flujos de negocio completos que involucran múltiples microservicios, el API Gateway y la comunicación asíncrona por RabbitMQ. Estas pruebas garantizan que los cambios en un servicio no rompan la integración global.
+
+### Escenarios Cubiertos
+
+1.  **Smoke Tests (01)**: Verificación de salud y disponibilidad del API Gateway.
+2.  **Seguridad (02)**: Control de acceso RBAC (ADMIN/USER), validación de tokens y denegación de acceso.
+3.  **Onboarding (03)**: Registro de empleado, creación de usuario en Auth, perfil en Perfiles y notificación de bienvenida.
+4.  **Offboarding (04)**: Desactivación de empleado, inhabilitación de usuario en Auth y notificación de desvinculación.
+
+### Ejecución de Pruebas
+
+```bash
+# Navegar a la carpeta de pruebas
+cd Reto5/e2e-tests
+
+# Instalar dependencias
+npm install
+
+# Ejecutar toda la suite en orden lógico
+npm test
+```
+
+Para más detalles, consulte el [README de pruebas E2E](Reto5/e2e-tests/README.md).

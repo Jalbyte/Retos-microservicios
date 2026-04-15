@@ -46,6 +46,11 @@ async function getDepartamentoWithRetry(id, retries = 3, delay = 500) {
   try {
     return await axiosInstance.get(`/departamentos/${id}`);
   } catch (error) {
+    // Si es 404, el departamento no existe. No reintentar, es un error de cliente.
+    if (error.response && error.response.status === 404) {
+      throw error;
+    }
+
     if (retries === 0) throw error;
 
     console.log(`Retrying departamento ${id}... intentos restantes: ${retries}`);
@@ -66,9 +71,10 @@ const departamentoBreaker = new CircuitBreaker(
   breakerOptions
 );
 
-departamentoBreaker.fallback(() => {
-  throw new Error("Servicio de departamentos no disponible");
-});
+// No usamos fallback para que el error original (ej. 404) llegue al controlador
+// departamentoBreaker.fallback(() => {
+//   throw new Error("Servicio de departamentos no disponible");
+// });
 // Configuración de Swagger
 const options = {
   definition: {
@@ -250,16 +256,30 @@ app.post('/empleado', authenticate, requireRole('ADMIN'), async (req, res) => {
     try {
       await departamentoBreaker.fire(departamento_id);
     } catch (err) {
-
       console.error("ERROR VALIDANDO DEPARTAMENTO:", err);
 
+      // Si el servicio de departamentos respondió con 404, el departamento no existe (error de cliente)
+      if (err.response && err.response.status === 404) {
+        return errorResponse(res, {
+          status: 400,
+          message: `El departamento con id ${departamento_id} no existe`,
+          path: '/empleado',
+          errors: [{
+            field: 'departamento_id',
+            message: 'Departamento no válido',
+            rejectedValue: departamento_id,
+          }],
+        });
+      }
+
+      // De lo contrario, es un error de disponibilidad del servicio
       return errorResponse(res, {
         status: 503,
         message: 'Servicio de departamentos no disponible',
         path: '/empleado',
         errors: [{
           field: 'departamento_id',
-          message: 'No se pudo validar el departamento',
+          message: 'No se pudo validar el departamento en este momento',
           rejectedValue: departamento_id,
         }],
       });
@@ -601,9 +621,10 @@ app.delete('/empleado/:id', authenticate, requireRole('ADMIN'), async (req, res)
       console.error("Error publicando evento:", err);
     }
 
-    return res.json({
+    return res.status(200).json({
+      status: 200,
       message: "Empleado desactivado exitosamente",
-      empleado: result.rows[0],
+      data: result.rows[0],
     });
   } catch (error) {
     console.error(error);

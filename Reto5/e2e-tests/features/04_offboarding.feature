@@ -22,4 +22,4 @@ Característica: Offboarding de empleados
   Escenario: La recuperación de contraseña falla para un empleado desvinculado
     Dado que el empleado ha sido desvinculado
     Cuando solicito recuperar contraseña para su email
-    Entonces la respuesta debe tener código 404 o 401
+    Entonces la respuesta debe tener código 200

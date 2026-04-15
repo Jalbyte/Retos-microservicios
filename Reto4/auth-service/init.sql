@@ -20,3 +20,12 @@ VALUES (
     true
 )
 ON CONFLICT (email) DO NOTHING;
+-- Semilla: juan@empresa.com / MiPass123
+INSERT INTO users (email, password, role, enabled)
+VALUES (
+    'juan@empresa.com',
+    '$2a$10$1/rDOGDOxm/11ZetXfflZOAhhSrKdZJWMiaPcftrNEgfPt/NHLEO2',
+    'USER',
+    true
+)
+ON CONFLICT (email) DO NOTHING;
