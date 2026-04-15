@@ -157,7 +157,7 @@ app.use((req, res) => {
 });
 
 // =========================
-// START SERVERcc
+// START SERVER
 // =========================
 const PORT = 3000;
 
