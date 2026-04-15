@@ -54,20 +54,7 @@ La suite usa variables de entorno cargadas con `dotenv`.
 
 Archivo sugerido `Reto5/e2e-tests/.env`:
 
-```env
-BASE_URL=http://localhost:3000
 
-ADMIN_EMAIL=admin@empresa.com
-ADMIN_PASSWORD=password
-
-USER_EMAIL=juan@empresa.com
-USER_PASSWORD=MiPass123
-
-JWT_SECRET=super_secret_reto4_jwt_key_2026
-
-POLLING_MAX_ATTEMPTS=15
-POLLING_INTERVAL_MS=2000
-```
 
 ### Variables importantes
 
