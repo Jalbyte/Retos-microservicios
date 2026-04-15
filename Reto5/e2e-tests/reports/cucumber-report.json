@@ -1,0 +1,279 @@
+[
+  {
+    "description": "  Como administrador\n  Quiero registrar nuevos empleados\n  Para que el sistema genere automáticamente sus credenciales y notificaciones",
+    "elements": [
+      {
+        "description": "",
+        "id": "onboarding-de-empleados;registro-exitoso-de-un-empleado",
+        "keyword": "Escenario",
+        "line": 11,
+        "name": "Registro exitoso de un empleado",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 383700
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que estoy autenticado como \"ADMIN\"",
+            "match": {
+              "location": "step_definitions\\security.steps.js:15"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 128045799
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 12,
+            "name": "registro un empleado con email único y departamento existente",
+            "match": {
+              "location": "step_definitions\\onboarding.steps.js:31"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 36851300
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 13,
+            "name": "la respuesta debe tener código 201",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1293799
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Y ",
+            "line": 14,
+            "name": "eventualmente el servicio de autenticación debe haber creado un usuario para ese email",
+            "match": {
+              "location": "step_definitions\\onboarding.steps.js:89"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 2120577699
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Y ",
+            "line": 15,
+            "name": "eventualmente debe existir una notificación de tipo BIENVENIDA para ese email",
+            "match": {
+              "location": "step_definitions\\onboarding.steps.js:100"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 53473200
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "onboarding-de-empleados;el-nuevo-empleado-puede-establecer-su-contraseña-y-hacer-login",
+        "keyword": "Escenario",
+        "line": 17,
+        "name": "El nuevo empleado puede establecer su contraseña y hacer login",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 47599
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que estoy autenticado como \"ADMIN\"",
+            "match": {
+              "location": "step_definitions\\security.steps.js:15"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 117308000
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 18,
+            "name": "que he registrado un empleado con email \"onboarding@empresa.com\"",
+            "match": {
+              "location": "step_definitions\\onboarding.steps.js:11"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 23321399
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 19,
+            "name": "establezco su contraseña usando el token de recuperación",
+            "match": {
+              "location": "step_definitions\\onboarding.steps.js:111"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 179854600
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 20,
+            "name": "la respuesta debe tener código 200",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 185699
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 21,
+            "name": "hago login con \"onboarding@empresa.com\" y la nueva contraseña",
+            "match": {
+              "location": "step_definitions\\onboarding.steps.js:130"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 111170299
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 22,
+            "name": "la respuesta debe tener código 200 y un token válido",
+            "match": {
+              "location": "step_definitions\\onboarding.steps.js:141"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 700100
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      },
+      {
+        "description": "",
+        "id": "onboarding-de-empleados;registro-con-datos-inválidos",
+        "keyword": "Escenario",
+        "line": 24,
+        "name": "Registro con datos inválidos",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 36399
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que estoy autenticado como \"ADMIN\"",
+            "match": {
+              "location": "step_definitions\\security.steps.js:15"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 107280899
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 25,
+            "name": "registro un empleado con departamento inexistente",
+            "match": {
+              "location": "step_definitions\\onboarding.steps.js:54"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 3539406600
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 27,
+            "name": "la respuesta debe tener código 400",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "failed",
+              "duration": 1475200,
+              "error_message": "AssertionError\n    + expected - actual\n\n    -503\n    +400\n\n    at CustomWorld.<anonymous> (C:\\Users\\Jhony\\Documents\\GitHub\\Retos-microservicios\\Reto5\\e2e-tests\\step_definitions\\smoke.steps.js:21:41)"
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 28,
+            "name": "registro un empleado sin email",
+            "match": {
+              "location": "step_definitions\\onboarding.steps.js:72"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 29,
+            "name": "la respuesta debe tener código 400",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "skipped",
+              "duration": 0
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      }
+    ],
+    "id": "onboarding-de-empleados",
+    "line": 3,
+    "keyword": "Característica",
+    "name": "Onboarding de empleados",
+    "tags": [],
+    "uri": "features\\onboarding.feature"
+  }
+]
