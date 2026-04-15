@@ -8,5 +8,5 @@ Característica: Verificación del sistema
   Escenario: El sistema responde correctamente
     Dado que el sistema está desplegado y operativo
     Cuando consulto la URL base
-    Entonces la respuesta debe tener código 404
-    Y el gateway devuelve 404 si no hay ruta, pero confirma que está vivo
+    Entonces la respuesta debe tener código 200
+    Y el gateway devuelve 200 si no hay ruta, pero confirma que está vivo

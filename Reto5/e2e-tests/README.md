@@ -100,7 +100,7 @@ La configuracion de Cucumber genera:
 
 ### 1) Smoke
 
-Valida que el gateway este vivo (respuesta esperada `404` en la URL base sin ruta especifica).
+Valida que el gateway este vivo (respuesta esperada `200` en la URL base).
 
 ### 2) Seguridad
 

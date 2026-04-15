@@ -15,6 +15,17 @@ const perfilesRoutes = require('./routes/perfiles');
 const notificacionesRoutes = require('./routes/notificaciones');
 
 // =========================
+// ROOT / HEALTH CHECK
+// =========================
+app.get('/', (req, res) => {
+  res.status(200).json({
+    status: 200,
+    message: 'API Gateway levantada y funcionando correctamente',
+    version: '1.0.0'
+  });
+});
+
+// =========================
 // AUTH (API)
 // =========================
 app.use(
@@ -146,7 +157,7 @@ app.use((req, res) => {
 });
 
 // =========================
-// START SERVER
+// START SERVERcc
 // =========================
 const PORT = 3000;
 
