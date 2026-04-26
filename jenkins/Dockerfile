@@ -6,6 +6,8 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends git docker.io docker-compose curl jq ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+RUN ln -sf /usr/bin/docker.io /usr/local/bin/docker
+
 # Avoid Git "dubious ownership" errors inside containerized Jenkins workspaces.
 RUN git config --system --add safe.directory '*'
 
