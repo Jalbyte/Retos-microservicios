@@ -1,0 +1,141 @@
+pipeline {
+  agent any
+
+  environment {
+    IMAGE_NAME = 'reto6-express-service'
+    SONAR_HOST_URL = "${env.SONAR_HOST_URL ?: 'http://sonarqube:9000'}"
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+  }
+
+  stages {
+    stage('Docker Preflight') {
+      steps {
+        sh 'docker --version'
+        sh 'docker ps'
+      }
+    }
+
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Build') {
+      steps {
+        sh '''
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace/Reto6 \
+            node:20-slim sh -c "npm ci"
+        '''
+      }
+    }
+
+    stage('Test') {
+      steps {
+        sh '''
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace/Reto6 \
+            node:20-slim sh -c "npm run test:unit"
+        '''
+      }
+      post {
+        always {
+          junit testResults: 'Reto6/reports/junit/*.xml', allowEmptyResults: true
+          archiveArtifacts artifacts: 'Reto6/coverage/lcov.info', fingerprint: true
+        }
+      }
+    }
+
+    stage('SonarQube') {
+      steps {
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+          dir('Reto6') {
+            sh '''
+              docker --version
+              docker ps >/dev/null
+              docker run --rm \
+                -e SONAR_HOST_URL=$SONAR_HOST_URL \
+                -e SONAR_TOKEN=$SONAR_TOKEN \
+                -v "$PWD:/usr/src" \
+                -w /usr/src \
+                sonarsource/sonar-scanner-cli:latest \
+                sonar-scanner \
+                  -Dsonar.host.url=$SONAR_HOST_URL \
+                  -Dsonar.token=$SONAR_TOKEN
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Quality Gate') {
+      steps {
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+          dir('Reto6') {
+            sh '''
+              set -e
+              CE_TASK_URL=$(grep ceTaskUrl .scannerwork/report-task.txt | cut -d= -f2-)
+              for i in $(seq 1 30); do
+                STATUS=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.status')
+                if [ "$STATUS" = "SUCCESS" ]; then
+                  break
+                fi
+                if [ "$STATUS" = "FAILED" ]; then
+                  echo "Analisis Sonar fallido"
+                  exit 1
+                fi
+                sleep 3
+              done
+
+              ANALYSIS_ID=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.analysisId')
+              QG_STATUS=$(curl -s -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" | jq -r '.projectStatus.status')
+
+              echo "Quality Gate: $QG_STATUS"
+              [ "$QG_STATUS" = "OK" ]
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Package') {
+      steps {
+        dir('Reto6') {
+          sh '''
+            docker build -t $IMAGE_NAME:$BUILD_NUMBER -t $IMAGE_NAME:latest .
+          '''
+        }
+      }
+    }
+
+    stage('E2E Tests') {
+      steps {
+        sh '''
+          set -e
+          docker-compose up -d reto6-express-service
+          sleep 12
+          docker run --rm \
+            --network host \
+            -e TEST_BASE_URL=http://localhost:8086 \
+            -v "$PWD:/workspace" \
+            -w /workspace/Reto6 \
+            node:20-slim sh -c "npm ci && npm run test:e2e"
+          docker-compose down
+        '''
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'docker-compose down || true'
+    }
+  }
+}
