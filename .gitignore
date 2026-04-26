@@ -75,3 +75,11 @@ Thumbs.db
 # =========================
 *.tmp
 *.temp
+
+# =========================
+# CI / SONAR / JENKINS
+# =========================
+.scannerwork/
+coverage/
+reports/
+jenkins_home/
