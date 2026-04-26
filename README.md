@@ -79,6 +79,7 @@ Swagger / OpenAPI:
 - JWT_SECRET (clave compartida para validacion JWT)
 - DATABASE_URL (auth-service)
 - RABBITMQ_URL (servicios que publican o consumen eventos)
+- GIT_USERNAME y GIT_TOKEN (credenciales GitHub para Jenkins via JCasC)
 
 Ver `.env.example` para el listado completo.
 

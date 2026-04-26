@@ -364,6 +364,8 @@ services:
       JENKINS_ADMIN_PASSWORD: admin123
       GIT_REPO_URL: https://github.com/Jalbyte/Retos-microservicios.git
       GIT_BRANCH: "*/main"
+      GIT_USERNAME: Jalbyte
+      GIT_TOKEN: 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
       SONAR_HOST_URL: http://sonarqube:9000
     ports:
       - "9090:8080"

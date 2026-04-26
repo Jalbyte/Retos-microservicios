@@ -16,6 +16,17 @@ unclassified:
   location:
     url: "http://localhost:9090/"
 
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: "github-pat"
+              username: "${GIT_USERNAME}"
+              password: "${GIT_TOKEN}"
+              description: "GitHub token for Jenkins SCM"
+
 jobs:
   - script: >
       pipelineJob('reto6-express-ci') {
@@ -23,7 +34,10 @@ jobs:
           cpsScm {
             scm {
               git {
-                remote { url('${GIT_REPO_URL:-https://github.com/Jalbyte/Retos-microservicios.git}') }
+                remote {
+                  url('${GIT_REPO_URL:-https://github.com/Jalbyte/Retos-microservicios.git}')
+                  credentials('github-pat')
+                }
                 branch('${GIT_BRANCH:-*/main}')
               }
             }
@@ -38,7 +52,10 @@ jobs:
           cpsScm {
             scm {
               git {
-                remote { url('${GIT_REPO_URL:-https://github.com/Jalbyte/Retos-microservicios.git}') }
+                remote {
+                  url('${GIT_REPO_URL:-https://github.com/Jalbyte/Retos-microservicios.git}')
+                  credentials('github-pat')
+                }
                 branch('${GIT_BRANCH:-*/main}')
               }
             }
