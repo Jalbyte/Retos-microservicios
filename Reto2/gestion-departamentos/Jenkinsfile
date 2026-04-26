@@ -1,0 +1,55 @@
+pipeline {
+  agent any
+
+  environment {
+    IMAGE_NAME = 'reto2-gestion-departamentos'
+  }
+
+  options {
+    timestamps()
+    disableConcurrentBuilds()
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
+    }
+
+    stage('Build') {
+      steps {
+        sh '''
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace/Reto2/gestion-departamentos \
+            golang:1.25 sh -c "go version && go mod download && go build ./..."
+        '''
+      }
+    }
+
+    stage('Test') {
+      steps {
+        sh '''
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace/Reto2/gestion-departamentos \
+            golang:1.25 sh -c "go test ./... -coverprofile=coverage.out"
+        '''
+      }
+      post {
+        always {
+          archiveArtifacts artifacts: 'Reto2/gestion-departamentos/coverage.out', fingerprint: true
+        }
+      }
+    }
+
+    stage('Package') {
+      steps {
+        dir('Reto2/gestion-departamentos') {
+          sh 'docker build -t $IMAGE_NAME:$BUILD_NUMBER -t $IMAGE_NAME:latest .'
+        }
+      }
+    }
+  }
+}
