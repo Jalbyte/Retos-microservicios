@@ -32,7 +32,7 @@ pipeline {
           docker run --rm \
             -v "$PWD:/workspace" \
             -w /workspace/Reto6 \
-            node:20-slim sh -c "npm ci"
+            node:20-slim sh -c "[ -f package-lock.json ] || npm install --package-lock-only; npm ci"
         '''
       }
     }
@@ -127,14 +127,9 @@ pipeline {
             -e TEST_BASE_URL=http://localhost:8086 \
             -v "$PWD:/workspace" \
             -w /workspace/Reto6 \
-            node:20-slim sh -c "npm ci && npm run test:e2e"
+            node:20-slim sh -c "[ -f package-lock.json ] || npm install --package-lock-only; npm ci && npm run test:e2e"
           docker-compose down
         '''
-      }
-      post {
-        always {
-          sh 'docker-compose down || true'
-        }
       }
     }
   }
