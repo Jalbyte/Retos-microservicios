@@ -1,0 +1,49 @@
+jenkins:
+  systemMessage: "Jenkins configurado como codigo para el Reto 6"
+  numExecutors: 2
+  mode: NORMAL
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_ID:-admin}"
+          password: "${JENKINS_ADMIN_PASSWORD:-admin123}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+unclassified:
+  location:
+    url: "http://localhost:9090/"
+
+jobs:
+  - script: >
+      pipelineJob('reto6-express-ci') {
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote { url('${GIT_REPO_URL:-https://github.com/Jalbyte/Retos-microservicios.git}') }
+                branch('${GIT_BRANCH:-*/main}')
+              }
+            }
+            scriptPath('Reto6/Jenkinsfile')
+            lightweight(true)
+          }
+        }
+      }
+  - script: >
+      pipelineJob('reto2-go-ci') {
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote { url('${GIT_REPO_URL:-https://github.com/Jalbyte/Retos-microservicios.git}') }
+                branch('${GIT_BRANCH:-*/main}')
+              }
+            }
+            scriptPath('Reto2/gestion-departamentos/Jenkinsfile')
+            lightweight(true)
+          }
+        }
+      }
