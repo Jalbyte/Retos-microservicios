@@ -39,10 +39,14 @@ jobs:
                   credentials('github-pat')
                 }
                 branch('${GIT_BRANCH:-*/main}')
+                extensions {
+                  wipeOutWorkspace()
+                  cleanBeforeCheckout()
+                }
               }
             }
             scriptPath('Reto6/Jenkinsfile')
-            lightweight(true)
+            lightweight(false)
           }
         }
       }
@@ -57,10 +61,14 @@ jobs:
                   credentials('github-pat')
                 }
                 branch('${GIT_BRANCH:-*/main}')
+                extensions {
+                  wipeOutWorkspace()
+                  cleanBeforeCheckout()
+                }
               }
             }
             scriptPath('Reto2/gestion-departamentos/Jenkinsfile')
-            lightweight(true)
+            lightweight(false)
           }
         }
       }

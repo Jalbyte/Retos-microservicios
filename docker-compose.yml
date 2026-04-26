@@ -356,6 +356,7 @@ services:
       context: ./jenkins
       dockerfile: Dockerfile
     container_name: jenkins_ci
+    user: root
     restart: always
     depends_on:
       - sonarqube

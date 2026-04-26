@@ -3,8 +3,11 @@ FROM jenkins/jenkins:lts-jdk17
 USER root
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends docker.io docker-compose curl jq ca-certificates \
+    && apt-get install -y --no-install-recommends git docker.io docker-compose curl jq ca-certificates \
     && rm -rf /var/lib/apt/lists/*
+
+# Avoid Git "dubious ownership" errors inside containerized Jenkins workspaces.
+RUN git config --system --add safe.directory '*'
 
 RUN groupadd -f docker && usermod -aG docker jenkins
 
