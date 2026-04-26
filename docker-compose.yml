@@ -233,7 +233,7 @@ services:
       DB_HOST: perfiles-db
       DB_PORT: 5432
       DB_USER: camilo
-      DB_PASSWORD: camilo
+      DB_PASSWORD: cameyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiYWRtaW4iOnRydWUsImlhdCI6MTUxNjIzOTAyMn0.KMUFsIDTnFmyG3nMiGM6H9FNFUROf3wh7SmqJp-QV30ilo
       DB_NAME: perfiles_db
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       RABBITMQ_EXCHANGE: empleados_exchange
