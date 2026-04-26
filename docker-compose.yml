@@ -296,9 +296,90 @@ services:
     ports:
       - "3000:3000"
 
+  # =========================
+  # RETO 6 - MICROSERVICIO EXPRESS
+  # =========================
+  reto6-express-service:
+    build: ./Reto6
+    container_name: reto6_express_api
+    restart: always
+    environment:
+      PORT: 8086
+    ports:
+      - "8086:8086"
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8086/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # =========================
+  # RETO 6 - SONARQUBE DB
+  # =========================
+  sonarqube-db:
+    image: postgres:15
+    container_name: sonarqube_db
+    restart: always
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonarqube
+    volumes:
+      - sonarqube_db_data:/var/lib/postgresql/data
+
+  # =========================
+  # RETO 6 - SONARQUBE
+  # =========================
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: sonarqube
+    restart: always
+    depends_on:
+      - sonarqube-db
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-db:5432/sonarqube
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+      - sonarqube_extensions:/opt/sonarqube/extensions
+
+  # =========================
+  # RETO 6 - JENKINS
+  # =========================
+  jenkins:
+    build:
+      context: ./jenkins
+      dockerfile: Dockerfile
+    container_name: jenkins_ci
+    restart: always
+    depends_on:
+      - sonarqube
+    environment:
+      JENKINS_ADMIN_ID: admin
+      JENKINS_ADMIN_PASSWORD: admin123
+      GIT_REPO_URL: https://github.com/Jalbyte/Retos-microservicios.git
+      GIT_BRANCH: "*/main"
+      SONAR_HOST_URL: http://sonarqube:9000
+    ports:
+      - "9090:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+
 volumes:
   empleados_data:
   departamentos_data:
   notifications_data:
   perfiles_data:
   auth_data:
+  sonarqube_db_data:
+  sonarqube_data:
+  sonarqube_logs:
+  sonarqube_extensions:
+  jenkins_home:
