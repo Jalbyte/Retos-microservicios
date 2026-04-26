@@ -4,6 +4,7 @@ pipeline {
   environment {
     IMAGE_NAME = 'reto6-express-service'
     SONAR_HOST_URL = "${env.SONAR_HOST_URL ?: 'http://sonarqube:9000'}"
+    JENKINS_CONTAINER = 'jenkins_ci'
   }
 
   options {
@@ -30,9 +31,9 @@ pipeline {
       steps {
         sh '''
           docker run --rm \
-            -v "$PWD:/workspace" \
-            -w /workspace/Reto6 \
-            node:20-slim sh -c "[ -f package-lock.json ] || npm install --package-lock-only; npm ci"
+            --volumes-from $JENKINS_CONTAINER \
+            -w "$WORKSPACE/Reto6" \
+            node:20-slim sh -lc "[ -f package-lock.json ] || npm install --package-lock-only; npm ci"
         '''
       }
     }
@@ -41,8 +42,8 @@ pipeline {
       steps {
         sh '''
           docker run --rm \
-            -v "$PWD:/workspace" \
-            -w /workspace/Reto6 \
+            --volumes-from $JENKINS_CONTAINER \
+            -w "$WORKSPACE/Reto6" \
             node:20-slim sh -c "npm run test:unit"
         '''
       }
@@ -57,21 +58,19 @@ pipeline {
     stage('SonarQube') {
       steps {
         withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
-          dir('Reto6') {
-            sh '''
-              docker --version
-              docker ps >/dev/null
-              docker run --rm \
-                -e SONAR_HOST_URL=$SONAR_HOST_URL \
-                -e SONAR_TOKEN=$SONAR_TOKEN \
-                -v "$PWD:/usr/src" \
-                -w /usr/src \
-                sonarsource/sonar-scanner-cli:latest \
-                sonar-scanner \
-                  -Dsonar.host.url=$SONAR_HOST_URL \
-                  -Dsonar.token=$SONAR_TOKEN
-            '''
-          }
+          sh '''
+            docker --version
+            docker ps >/dev/null
+            docker run --rm \
+              --volumes-from $JENKINS_CONTAINER \
+              -e SONAR_HOST_URL=$SONAR_HOST_URL \
+              -e SONAR_TOKEN=$SONAR_TOKEN \
+              -w "$WORKSPACE/Reto6" \
+              sonarsource/sonar-scanner-cli:latest \
+              sonar-scanner \
+                -Dsonar.host.url=$SONAR_HOST_URL \
+                -Dsonar.token=$SONAR_TOKEN
+          '''
         }
       }
     }
@@ -125,9 +124,9 @@ pipeline {
           docker run --rm \
             --network host \
             -e TEST_BASE_URL=http://localhost:8086 \
-            -v "$PWD:/workspace" \
-            -w /workspace/Reto6 \
-            node:20-slim sh -c "[ -f package-lock.json ] || npm install --package-lock-only; npm ci && npm run test:e2e"
+            --volumes-from $JENKINS_CONTAINER \
+            -w "$WORKSPACE/Reto6" \
+            node:20-slim sh -lc "[ -f package-lock.json ] || npm install --package-lock-only; npm ci && npm run test:e2e"
           docker-compose down
         '''
       }

@@ -3,6 +3,7 @@ pipeline {
 
   environment {
     IMAGE_NAME = 'reto2-gestion-departamentos'
+    JENKINS_CONTAINER = 'jenkins_ci'
   }
 
   options {
@@ -22,8 +23,8 @@ pipeline {
       steps {
         sh '''
           docker run --rm \
-            -v "$PWD:/workspace" \
-            -w /workspace/Reto2/gestion-departamentos \
+            --volumes-from $JENKINS_CONTAINER \
+            -w "$WORKSPACE/Reto2/gestion-departamentos" \
             golang:1.25 sh -c "go version && go mod download && go build ./..."
         '''
       }
@@ -33,8 +34,8 @@ pipeline {
       steps {
         sh '''
           docker run --rm \
-            -v "$PWD:/workspace" \
-            -w /workspace/Reto2/gestion-departamentos \
+            --volumes-from $JENKINS_CONTAINER \
+            -w "$WORKSPACE/Reto2/gestion-departamentos" \
             golang:1.25 sh -c "go test ./... -coverprofile=coverage.out"
         '''
       }
