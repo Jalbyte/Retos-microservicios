@@ -62,6 +62,7 @@ pipeline {
             docker --version
             docker ps >/dev/null
             docker run --rm \
+              --network container:$JENKINS_CONTAINER \
               --volumes-from $JENKINS_CONTAINER \
               -e SONAR_HOST_URL=$SONAR_HOST_URL \
               -e SONAR_TOKEN=$SONAR_TOKEN \
