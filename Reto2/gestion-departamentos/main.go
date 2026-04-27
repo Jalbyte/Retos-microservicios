@@ -288,7 +288,7 @@ func main() {
 		ginSwagger.URL("/swagger/doc.json"),
 		ginSwagger.PersistAuthorization(true),
 	))
-	r.POST("/departamentos", CreateDepartamento)
+	r.POST("/departamentos", RequireRole("ADMIN"), CreateDepartamento)
 	r.GET("/departamentos", GetDepartamentos)
 	r.GET("/departamentos/:id", GetDepartamentoByID)
 	r.Any("/health", health)
