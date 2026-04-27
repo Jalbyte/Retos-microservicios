@@ -368,6 +368,7 @@ services:
       GIT_USERNAME: Jalbyte
       GIT_TOKEN: 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
       SONAR_HOST_URL: http://sonarqube:9000
+      SONAR_TOKEN: ${SONAR_TOKEN:-}
     ports:
       - "9090:8080"
       - "50000:50000"

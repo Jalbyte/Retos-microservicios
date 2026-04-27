@@ -26,6 +26,11 @@ credentials:
               username: "${GIT_USERNAME}"
               password: "${GIT_TOKEN}"
               description: "GitHub token for Jenkins SCM"
+          - string:
+              scope: GLOBAL
+              id: "sonar-token"
+              secret: "${SONAR_TOKEN}"
+              description: "SonarQube token for analysis and quality gate"
 
 jobs:
   - script: >
