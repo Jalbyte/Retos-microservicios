@@ -229,7 +229,7 @@ app.post('/empleado', authenticate, requireRole('ADMIN'), async (req, res) => {
 
   const fecha = new Date(fechaIngreso);
 
-  if (isNaN(fecha.getTime())) {
+  if (Number.isNaN(fecha.getTime())) {
     return errorResponse(res, {
       status: 400,
       message: 'Fecha inválida',
@@ -404,13 +404,13 @@ app.post('/empleado', authenticate, requireRole('ADMIN'), async (req, res) => {
  */
 app.get('/empleado', authenticate, requireRole('ADMIN', 'USER'), async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page) || 1);
-    const size = Math.min(100, Math.max(1, parseInt(req.query.size) || 5));
+    const page = Math.max(1, Number.parseInt(req.query.page) || 1);
+    const size = Math.min(100, Math.max(1, Number.parseInt(req.query.size) || 5));
     const skip = (page - 1) * size;
 
     // Total de registros activos
     const countResult = await pool.query('SELECT COUNT(*) FROM empleado WHERE is_active = true');
-    const totalElements = parseInt(countResult.rows[0].count);
+    const totalElements = Number.parseInt(countResult.rows[0].count);
 
     // Datos paginados (solo activos)
     const dataResult = await pool.query(
@@ -484,7 +484,7 @@ app.get('/empleado/:id', authenticate, requireRole('ADMIN', 'USER'), async (req,
   const { id } = req.params;
   const result = await pool.query(
     'SELECT * FROM empleado WHERE id = $1 AND is_active = true',
-    [parseInt(id)]
+    [Number.parseInt(id)]
   );
 
   if (result.rows.length > 0) {
@@ -566,7 +566,7 @@ app.delete('/empleado/:id', authenticate, requireRole('ADMIN'), async (req, res)
   try {
     const result = await pool.query(
       'UPDATE empleado SET is_active = false WHERE id = $1 AND is_active = true RETURNING *',
-      [parseInt(id)]
+      [Number.parseInt(id)]
     );
 
     if (result.rowCount === 0) {

@@ -1,5 +1,5 @@
 const { Given, When, Then } = require('@cucumber/cucumber');
-const assert = require('assert');
+const assert = require('node:assert');
 const axios = require('axios');
 
 const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:8086';

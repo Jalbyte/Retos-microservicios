@@ -11,6 +11,10 @@ pipeline {
     disableConcurrentBuilds()
   }
 
+  triggers {
+    pollSCM('* * * * *')
+  }
+
   stages {
     stage('Checkout') {
       steps {

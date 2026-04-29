@@ -25,10 +25,10 @@ import (
 	"strings"
 	"time"
 
-	_ "gestion-departamentos/docs"
+	_ "gestion-departamentos/docs" // Init swagger docs
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" // Postgres driver
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -129,7 +129,11 @@ func parseJWT(tokenStr, secret string) (*jwtClaims, error) {
 func JWTMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		path := c.Request.URL.Path
-		if path == "/health" ||
+		healthPath := os.Getenv("HEALTH_ENDPOINT")
+		if healthPath == "" {
+			healthPath = "/health"
+		}
+		if path == healthPath ||
 			strings.HasPrefix(path, "/swagger/") ||
 			path == "/swagger" {
 			c.Next()

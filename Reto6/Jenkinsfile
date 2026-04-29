@@ -12,6 +12,10 @@ pipeline {
     disableConcurrentBuilds()
   }
 
+  triggers {
+    pollSCM('* * * * *')
+  }
+
   stages {
     stage('Docker Preflight') {
       steps {
@@ -63,7 +67,7 @@ pipeline {
             docker ps >/dev/null
             docker run --rm \
               -u root \
-              --network container:$JENKINS_CONTAINER \
+              --network retosmicro_default \
               --volumes-from $JENKINS_CONTAINER \
               -e SONAR_HOST_URL=$SONAR_HOST_URL \
               -e SONAR_TOKEN=$SONAR_TOKEN \

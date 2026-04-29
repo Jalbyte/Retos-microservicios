@@ -10,12 +10,7 @@ RUN go mod download
 
 COPY . .
 
-# Instalar swag y generar documentación
-RUN go install github.com/swaggo/swag/cmd/swag@latest
-RUN swag init
-
-# Compilar binario
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main .
+RUN go install github.com/swaggo/swag/cmd/swag@latest && swag init && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o main .
 
 # ---------- RUNTIME STAGE ----------
 FROM alpine:latest

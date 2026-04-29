@@ -5,9 +5,8 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     wget \
-    && rm -rf /var/lib/apt/lists/*
-
-RUN groupadd -r appgroup && useradd -r -g appgroup miguel
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -r appgroup && useradd -r -g appgroup miguel
 
 COPY package*.json ./
 RUN npm install

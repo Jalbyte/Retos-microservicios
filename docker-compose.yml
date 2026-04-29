@@ -7,16 +7,16 @@ services:
     container_name: empleados_db
     restart: always
     environment:
-      POSTGRES_USER: camilo
-      POSTGRES_PASSWORD: camilo
-      POSTGRES_DB: empleados_db
+      POSTGRES_USER: ${POSTGRES_USER:-camilo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-camilo}
+      POSTGRES_DB: ${POSTGRES_DB_EMPLEADOS:-empleados_db}
     ports:
       - "5433:5432"
     volumes:
       - empleados_data:/var/lib/postgresql/data
       - ./Reto1/gestion-empleados/init.sql:/docker-entrypoint-initdb.d/init.sql:Z
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U camilo -d empleados_db" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-camilo} -d ${POSTGRES_DB_EMPLEADOS:-empleados_db}" ]
       interval: 5s
       timeout: 5s
       retries: 5
