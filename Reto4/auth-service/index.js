@@ -14,7 +14,11 @@ app.use(express.json());
 app.use(cors());
 
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'super_secret_reto4_jwt_key_2026';
+const JWT_SECRET = process.env.JWT_SECRET;
+
+if (!JWT_SECRET) {
+  throw new Error('JWT_SECRET es obligatorio. Configuralo en el archivo .env del proyecto.');
+}
 
 // ─── Swagger / OpenAPI ────────────────────────────────────────────────────────
 const swaggerOptions = {

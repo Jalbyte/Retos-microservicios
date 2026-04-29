@@ -4,19 +4,28 @@ const { createServiceProxy } = require('../utils/proxy');
 
 module.exports = (app) => {
 
-  // ADMIN → crear empleado
+  // ADMIN → crear empleado (POST)
+  // Consultas -> ADMIN/USER
+  app.get(
+    ['/empleado', '/empleado/:id'],
+    authenticate,
+    requireRole('USER', 'ADMIN'),
+    createServiceProxy('http://empleados-service:8080')
+  );
+
+  // Escritura -> ADMIN
   app.use(
-    '/empleado',
+    ['/empleado', '/empleado/:id'],
     authenticate,
     requireRole('ADMIN'),
     createServiceProxy('http://empleados-service:8080')
   );
 
-  // USER o ADMIN → consultas
+  // Retrocompatibilidad
   app.use(
-    '/empleados',
+    ['/empleados', '/empleados/*'],
     authenticate,
     requireRole('USER', 'ADMIN'),
-    createServiceProxy('http://empleados-service:8080')
+    createServiceProxy('http://empleados-service:8080', { '^/empleados': '/empleado' })
   );
 };

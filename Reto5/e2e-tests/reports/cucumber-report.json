@@ -1,0 +1,84 @@
+[
+  {
+    "description": "  Para confirmar que el sistema está operativo\n  Como suite de pruebas\n  Quiero verificar que el API Gateway responde",
+    "elements": [
+      {
+        "description": "",
+        "id": "verificación-del-sistema;el-sistema-responde-correctamente",
+        "keyword": "Escenario",
+        "line": 8,
+        "name": "El sistema responde correctamente",
+        "steps": [
+          {
+            "keyword": "Before",
+            "hidden": true,
+            "result": {
+              "status": "passed",
+              "duration": 186699
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Dado ",
+            "line": 9,
+            "name": "que el sistema está desplegado y operativo",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:8"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 254500
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Cuando ",
+            "line": 10,
+            "name": "consulto la URL base",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:12"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 4294200
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Entonces ",
+            "line": 11,
+            "name": "la respuesta debe tener código 200",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:20"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 1021299
+            }
+          },
+          {
+            "arguments": [],
+            "keyword": "Y ",
+            "line": 12,
+            "name": "el gateway devuelve 200 si no hay ruta, pero confirma que está vivo",
+            "match": {
+              "location": "step_definitions\\smoke.steps.js:29"
+            },
+            "result": {
+              "status": "passed",
+              "duration": 204600
+            }
+          }
+        ],
+        "tags": [],
+        "type": "scenario"
+      }
+    ],
+    "id": "verificación-del-sistema",
+    "line": 3,
+    "keyword": "Característica",
+    "name": "Verificación del sistema",
+    "tags": [],
+    "uri": "features\\01_smoke.feature"
+  }
+]
