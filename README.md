@@ -67,6 +67,15 @@ Swagger / OpenAPI:
 - RabbitMQ AMQP: amqp://localhost:5672
 - RabbitMQ Management: http://localhost:15672 (admin / admin)
 
+### Pruebas End-to-End (E2E)
+Se implementa una suite de pruebas E2E con Cucumber para validar flujos completos del sistema a través del API Gateway, asegurando la correcta integración entre microservicios y la mensajería con RabbitMQ.
+
+Cobertura
+- Smoke tests: Verificación de disponibilidad del sistema (API Gateway).
+- Seguridad (RBAC): Validación de autenticación JWT y control de acceso por roles.
+- Onboarding: Creación de empleado con propagación a Auth, Perfiles y notificaciones.
+- Offboarding: Desactivación de empleado con impacto en Auth y envío de notificación.
+
 ### CI/CD
 
 - Jenkins: http://localhost:9090 (admin / admin123)
