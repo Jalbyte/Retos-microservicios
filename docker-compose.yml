@@ -134,6 +134,9 @@ services:
       DEPARTAMENTOS_URL: http://departamentos-service:8081
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       JWT_SECRET: super_secret_reto4_jwt_key_2026
+      OTEL_SERVICE_NAME: empleados-service
+      OTEL_EXPORTER_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      OTEL_PROPAGATORS: tracecontext,baggage
     ports:
       - "${EMP_SVC_PORT:-8080}:8080"
     healthcheck:
@@ -157,6 +160,9 @@ services:
       PORT: 8081
       DATABASE_URL: postgresql://camilo:camilo@database-departamentos:5432/departamentos_db?sslmode=disable
       JWT_SECRET: super_secret_reto4_jwt_key_2026
+      OTEL_SERVICE_NAME: departamentos-service
+      OTEL_EXPORTER_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      OTEL_PROPAGATORS: tracecontext,baggage
     ports:
       - "${DEP_SVC_PORT:-8081}:8081"
     healthcheck:
@@ -207,6 +213,9 @@ services:
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       RABBITMQ_EXCHANGE: empleados_exchange
       JWT_SECRET: super_secret_reto4_jwt_key_2026
+      OTEL_SERVICE_NAME: notificaciones-service
+      OTEL_EXPORTER_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      OTEL_PROPAGATORS: tracecontext,baggage
     ports:
       - "${NOT_SVC_PORT:-8084}:8084"
     healthcheck:
@@ -238,6 +247,9 @@ services:
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       RABBITMQ_EXCHANGE: empleados_exchange
       JWT_SECRET: super_secret_reto4_jwt_key_2026
+      OTEL_SERVICE_NAME: perfiles-service
+      OTEL_EXPORTER_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      OTEL_PROPAGATORS: tracecontext,baggage
     ports:
       - "${PER_SVC_PORT:-8085}:8085"
     healthcheck:
@@ -265,8 +277,11 @@ services:
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       RABBITMQ_EXCHANGE: empleados_exchange
       AUTH_EXCHANGE: auth_exchange
+      OTEL_SERVICE_NAME: auth-service
+      OTEL_EXPORTER_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      OTEL_PROPAGATORS: tracecontext,baggage
     ports:
-      - "${AUTH_SVC_PORT:-3001}:3001"
+      - "${AUTH_SVC_PORT:-3002}:3001"
     healthcheck:
       test: [ "CMD", "wget", "--spider", "-q", "http://localhost:3001/health" ]
       interval: 10s
@@ -289,6 +304,9 @@ services:
       - auth-service
     environment:
       JWT_SECRET: super_secret_reto4_jwt_key_2026
+      OTEL_SERVICE_NAME: api-gateway
+      OTEL_EXPORTER_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      OTEL_PROPAGATORS: tracecontext,baggage
     ports:
       - "${GATEWAY_PORT:-3000}:3000"
     networks:
@@ -302,6 +320,9 @@ services:
     restart: always
     environment:
       PORT: 8086
+      OTEL_SERVICE_NAME: reto6-express-service
+      OTEL_EXPORTER_ZIPKIN_ENDPOINT: http://zipkin:9411/api/v2/spans
+      OTEL_PROPAGATORS: tracecontext,baggage
     ports:
       - "${RETO6_PORT:-8086}:8086"
     healthcheck:
@@ -378,6 +399,78 @@ services:
     networks:
       - microservices-network
 
+  # =========================
+  # RETO 7 - OBSERVABILIDAD
+  # =========================
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: always
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    ports:
+      - "${PROM_PORT:-9091}:9090"
+    networks:
+      - microservices-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+      - loki
+    networks:
+      - microservices-network
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: always
+    ports:
+      - "${LOKI_PORT:-3100}:3100"
+    volumes:
+      - ./observability/loki/loki-config.yml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - microservices-network
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ./observability/promtail/promtail-config.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - microservices-network
+
+  zipkin:
+    image: openzipkin/zipkin:latest
+    container_name: zipkin
+    restart: always
+    ports:
+      - "${ZIPKIN_PORT:-9411}:9411"
+    networks:
+      - microservices-network
+
 networks:
   microservices-network:
     driver: bridge
@@ -393,3 +486,5 @@ volumes:
   sonarqube_logs:
   sonarqube_extensions:
   jenkins_home:
+  prometheus_data:
+  grafana_data:
