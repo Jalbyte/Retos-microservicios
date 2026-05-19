@@ -21,6 +21,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks:
+      - microservices-network
 
   # =========================
   # BASE DE DATOS DEPARTAMENTOS
@@ -44,6 +46,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks:
+      - microservices-network
 
   # =========================
   # BASE DE DATOS NOTIFICACIONES
@@ -66,6 +70,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - microservices-network
 
   # =========================
   # BASE DE DATOS PERFILES
@@ -88,6 +94,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks:
+      - microservices-network
 
   # =========================
   # BASE DE DATOS AUTH (Reto 4)
@@ -111,6 +119,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks:
+      - microservices-network
 
   # =========================
   # SERVICIO EMPLEADOS
@@ -142,6 +152,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 15s
+    networks:
+      - microservices-network
 
   # =========================
   # SERVICIO DEPARTAMENTOS
@@ -165,6 +177,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - microservices-network
 
   # =========================
   # RABBITMQ
@@ -185,6 +199,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - microservices-network
 
   # =========================
   # SERVICIO NOTIFICACIONES
@@ -215,6 +231,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - microservices-network
 
   # =========================
   # SERVICIO PERFILES
@@ -247,6 +265,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - microservices-network
 
   # =========================
   # AUTH SERVICE (Reto 4)
@@ -275,6 +295,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - microservices-network
 
   # =========================
   # API GATEWAY
@@ -296,6 +318,8 @@ services:
       JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:
       - "3000:3000"
+    networks:
+      - microservices-network
 
   # =========================
   # RETO 6 - MICROSERVICIO EXPRESS
@@ -314,6 +338,8 @@ services:
       timeout: 5s
       retries: 5
       start_period: 20s
+    networks:
+      - microservices-network
 
   # =========================
   # RETO 6 - SONARQUBE DB
@@ -328,6 +354,8 @@ services:
       POSTGRES_DB: sonarqube
     volumes:
       - sonarqube_db_data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
 
   # =========================
   # RETO 6 - SONARQUBE
@@ -348,6 +376,14 @@ services:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_logs:/opt/sonarqube/logs
       - sonarqube_extensions:/opt/sonarqube/extensions
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - microservices-network
 
   # =========================
   # RETO 6 - JENKINS
@@ -360,7 +396,8 @@ services:
     user: root
     restart: always
     depends_on:
-      - sonarqube
+      sonarqube:
+        condition: service_healthy
     environment:
       JENKINS_ADMIN_ID: admin
       JENKINS_ADMIN_PASSWORD: admin123
@@ -376,6 +413,12 @@ services:
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - microservices-network
+
+networks:
+  microservices-network:
+    driver: bridge
 
 volumes:
   empleados_data:

@@ -63,17 +63,19 @@ pipeline {
       steps {
         withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
           sh '''
-            docker --version
-            docker ps >/dev/null
             docker run --rm \
               -u root \
-              --network retosmicro_default \
+              --network microservices-network \
               --volumes-from $JENKINS_CONTAINER \
               -e SONAR_HOST_URL=$SONAR_HOST_URL \
               -e SONAR_TOKEN=$SONAR_TOKEN \
               -w "$WORKSPACE/Reto6" \
               sonarsource/sonar-scanner-cli:latest \
               sonar-scanner \
+                -Dsonar.projectKey=reto6-express-service \
+                -Dsonar.projectName="Reto 6 Express Service" \
+                -Dsonar.sources=. \
+                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                 -Dsonar.host.url=$SONAR_HOST_URL \
                 -Dsonar.token=$SONAR_TOKEN \
                 -Dsonar.working.directory=.scannerwork
@@ -88,24 +90,38 @@ pipeline {
           dir('Reto6') {
             sh '''
               set -e
+              # Polling for background task completion
               CE_TASK_URL=$(grep ceTaskUrl .scannerwork/report-task.txt | cut -d= -f2-)
+              echo "Checking task status at $CE_TASK_URL"
+              
               for i in $(seq 1 30); do
-                STATUS=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.status')
+                TASK_RESPONSE=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL")
+                STATUS=$(echo "$TASK_RESPONSE" | jq -r '.task.status')
+                echo "Task status: $STATUS"
+                
                 if [ "$STATUS" = "SUCCESS" ]; then
+                  ANALYSIS_ID=$(echo "$TASK_RESPONSE" | jq -r '.task.analysisId')
                   break
                 fi
                 if [ "$STATUS" = "FAILED" ]; then
-                  echo "Analisis Sonar fallido"
+                  echo "SonarQube analysis failed"
                   exit 1
                 fi
-                sleep 3
+                sleep 5
               done
 
-              ANALYSIS_ID=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.analysisId')
-              QG_STATUS=$(curl -s -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" | jq -r '.projectStatus.status')
+              if [ -z "$ANALYSIS_ID" ]; then
+                echo "Timeout waiting for SonarQube analysis"
+                exit 1
+              fi
 
-              echo "Quality Gate: $QG_STATUS"
-              [ "$QG_STATUS" = "OK" ]
+              QG_STATUS=$(curl -s -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" | jq -r '.projectStatus.status')
+              echo "Quality Gate status: $QG_STATUS"
+              
+              if [ "$QG_STATUS" != "OK" ]; then
+                echo "Quality Gate failed: $QG_STATUS"
+                exit 1
+              fi
             '''
           }
         }
@@ -126,16 +142,32 @@ pipeline {
       steps {
         sh '''
           set -e
+          # Start necessary services for E2E
           docker-compose up -d reto6-express-service
-          sleep 12
+          
+          # Wait for service to be healthy
+          echo "Waiting for service to be healthy..."
+          for i in $(seq 1 20); do
+            if curl -s http://reto6-express-service:8086/health | grep -q "ok"; then
+              echo "Service is up!"
+              break
+            fi
+            sleep 3
+          done
+
+          # Run Cucumber tests from a container
           docker run --rm \
-            --network host \
-            -e TEST_BASE_URL=http://localhost:8086 \
+            --network microservices-network \
+            -e TEST_BASE_URL=http://reto6_express_api:8086 \
             --volumes-from $JENKINS_CONTAINER \
             -w "$WORKSPACE/Reto6" \
-            node:20-slim sh -lc "[ -f package-lock.json ] || npm install --package-lock-only; npm ci && npm run test:e2e"
-          docker-compose down
+            node:20-slim sh -lc "npm ci && npm run test:e2e"
         '''
+      }
+      post {
+        always {
+          docker-compose stop reto6-express-service
+        }
       }
     }
   }

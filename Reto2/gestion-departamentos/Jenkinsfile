@@ -3,6 +3,7 @@ pipeline {
 
   environment {
     IMAGE_NAME = 'reto2-gestion-departamentos'
+    SONAR_HOST_URL = "${env.SONAR_HOST_URL ?: 'http://sonarqube:9000'}"
     JENKINS_CONTAINER = 'jenkins_ci'
   }
 
@@ -29,7 +30,7 @@ pipeline {
           docker run --rm \
             --volumes-from $JENKINS_CONTAINER \
             -w "$WORKSPACE/Reto2/gestion-departamentos" \
-            golang:1.25 sh -c "go version && go mod download && go build ./..."
+            golang:1.23 sh -c "go version && go mod download && go build ./..."
         '''
       }
     }
@@ -40,12 +41,76 @@ pipeline {
           docker run --rm \
             --volumes-from $JENKINS_CONTAINER \
             -w "$WORKSPACE/Reto2/gestion-departamentos" \
-            golang:1.25 sh -c "go test ./... -coverprofile=coverage.out"
+            golang:1.23 sh -c "go test ./... -coverprofile=coverage.out"
         '''
       }
       post {
         always {
           archiveArtifacts artifacts: 'Reto2/gestion-departamentos/coverage.out', fingerprint: true
+        }
+      }
+    }
+
+    stage('SonarQube') {
+      steps {
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+          sh '''
+            docker run --rm \
+              -u root \
+              --network microservices-network \
+              --volumes-from $JENKINS_CONTAINER \
+              -e SONAR_HOST_URL=$SONAR_HOST_URL \
+              -e SONAR_TOKEN=$SONAR_TOKEN \
+              -w "$WORKSPACE/Reto2/gestion-departamentos" \
+              sonarsource/sonar-scanner-cli:latest \
+              sonar-scanner \
+                -Dsonar.projectKey=reto2-gestion-departamentos \
+                -Dsonar.projectName="Reto 2 Gestion Departamentos" \
+                -Dsonar.sources=. \
+                -Dsonar.exclusions=**/*_test.go \
+                -Dsonar.go.coverage.reportPaths=coverage.out \
+                -Dsonar.host.url=$SONAR_HOST_URL \
+                -Dsonar.token=$SONAR_TOKEN \
+                -Dsonar.working.directory=.scannerwork
+          '''
+        }
+      }
+    }
+
+    stage('Quality Gate') {
+      steps {
+        withCredentials([string(credentialsId: 'sonar-token', variable: 'SONAR_TOKEN')]) {
+          dir('Reto2/gestion-departamentos') {
+            sh '''
+              set -e
+              CE_TASK_URL=$(grep ceTaskUrl .scannerwork/report-task.txt | cut -d= -f2-)
+              echo "Checking task status at $CE_TASK_URL"
+              
+              for i in $(seq 1 30); do
+                TASK_RESPONSE=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL")
+                STATUS=$(echo "$TASK_RESPONSE" | jq -r '.task.status')
+                
+                if [ "$STATUS" = "SUCCESS" ]; then
+                  ANALYSIS_ID=$(echo "$TASK_RESPONSE" | jq -r '.task.analysisId')
+                  break
+                fi
+                if [ "$STATUS" = "FAILED" ]; then
+                  echo "SonarQube analysis failed"
+                  exit 1
+                fi
+                sleep 5
+              done
+
+              if [ -z "$ANALYSIS_ID" ]; then
+                echo "Timeout waiting for SonarQube analysis"
+                exit 1
+              fi
+
+              QG_STATUS=$(curl -s -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" | jq -r '.projectStatus.status')
+              echo "Quality Gate status: $QG_STATUS"
+              [ "$QG_STATUS" = "OK" ]
+            '''
+          }
         }
       }
     }
