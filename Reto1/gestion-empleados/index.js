@@ -1,10 +1,23 @@
+require('./tracing');
+const logger = require('./logger');
 const express = require('express');
 const { authenticate, requireRole } = require('./middleware/auth');
 const cors = require('cors');
+const client = require('prom-client');
 // Cargar variables de entorno
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+// ─── Metrics (Prometheus) ───────────────────────────────────────────────────
+const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
+
 const { Pool } = require('pg');
 
 const pool = new Pool({
@@ -14,7 +27,7 @@ const pool = new Pool({
 // Conectar a RabbitMQ
 const { connectRabbit, publishEvent } = require("./rabbitmq");
 
-connectRabbit().catch(err => console.error('[RabbitMQ] Error al iniciar conexión:', err.message));
+connectRabbit().catch(err => logger.error(`[RabbitMQ] Error al iniciar conexión: ${err.message}`));
 
 // CORS middleware
 const swaggerUi = require('swagger-ui-express');
@@ -53,7 +66,7 @@ async function getDepartamentoWithRetry(id, retries = 3, delay = 500) {
 
     if (retries === 0) throw error;
 
-    console.log(`Retrying departamento ${id}... intentos restantes: ${retries}`);
+    logger.info(`Retrying departamento ${id}... intentos restantes: ${retries}`);
     await new Promise(resolve => setTimeout(resolve, delay));
 
     return getDepartamentoWithRetry(id, retries - 1, delay * 2);
@@ -256,7 +269,7 @@ app.post('/empleado', authenticate, requireRole('ADMIN'), async (req, res) => {
     try {
       await departamentoBreaker.fire(departamento_id);
     } catch (err) {
-      console.error("ERROR VALIDANDO DEPARTAMENTO:", err);
+      logger.error(`ERROR VALIDANDO DEPARTAMENTO: ${err}`);
 
       // Si el servicio de departamentos respondió con 404, el departamento no existe (error de cliente)
       if (err.response && err.response.status === 404) {
@@ -320,9 +333,9 @@ app.post('/empleado', authenticate, requireRole('ADMIN'), async (req, res) => {
         }
       });
 
-      console.log("Evento empleado.creado publicado");
+      logger.info("Evento empleado.creado publicado");
     } catch (err) {
-      console.error("Error publicando evento:", err);
+      logger.error(`Error publicando evento: ${err}`);
     }
 
     // Respuesta normal
@@ -330,7 +343,7 @@ app.post('/empleado', authenticate, requireRole('ADMIN'), async (req, res) => {
 
   } catch (error) {
 
-    console.error("ERROR AL CREAR EMPLEADO:", error);
+    logger.error(`ERROR AL CREAR EMPLEADO: ${error}`);
 
     // Error por email duplicado (constraint UNIQUE)
     if (error.code === '23505') {
@@ -446,7 +459,7 @@ app.get('/empleado', authenticate, requireRole('ADMIN', 'USER'), async (req, res
     });
 
   } catch (error) {
-    console.error(error);
+    logger.error(error);
     res.status(500).json({
       status: 500,
       error: "Internal Server Error",
@@ -616,9 +629,9 @@ app.delete('/empleado/:id', authenticate, requireRole('ADMIN'), async (req, res)
           fechaIngreso: result.rows[0].fecha_ingreso
         }
       });
-      console.log("Evento empleado.eliminado publicado");
+      logger.info("Evento empleado.eliminado publicado");
     } catch (err) {
-      console.error("Error publicando evento:", err);
+      logger.error(`Error publicando evento: ${err}`);
     }
 
     return res.status(200).json({
@@ -627,7 +640,7 @@ app.delete('/empleado/:id', authenticate, requireRole('ADMIN'), async (req, res)
       data: result.rows[0],
     });
   } catch (error) {
-    console.error(error);
+    logger.error(error);
     return errorResponse(res, {
       status: 500,
       message: 'Error interno al eliminar el empleado',
@@ -656,6 +669,6 @@ app.use((req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Servidor listo en http://localhost:${PORT}`);
+  logger.info(`Servidor listo en http://localhost:${PORT}`);
 });
 
