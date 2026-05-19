@@ -124,14 +124,10 @@ services:
     build: ./Reto1/gestion-empleados
     restart: always
     depends_on:
-      database-empleados:
-        condition: service_healthy
-      departamentos-service:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
-      auth-service:
-        condition: service_healthy
+      - database-empleados
+      - departamentos-service
+      - rabbitmq
+      - auth-service
     environment:
       PORT: 8080
       DATABASE_URL: postgresql://camilo:camilo@database-empleados:5432/empleados_db?schema=public
@@ -156,8 +152,7 @@ services:
     build: ./Reto2/gestion-departamentos
     restart: always
     depends_on:
-      database-departamentos:
-        condition: service_healthy
+      - database-departamentos
     environment:
       PORT: 8081
       DATABASE_URL: postgresql://camilo:camilo@database-departamentos:5432/departamentos_db?sslmode=disable
@@ -201,10 +196,8 @@ services:
     build: ./Reto3/servicio-notificaciones
     restart: always
     depends_on:
-      notification-db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - notification-db
+      - rabbitmq
     environment:
       DB_HOST: notification-db
       DB_USER: root
@@ -232,10 +225,8 @@ services:
     build: ./Reto3/gestion-perfiles
     restart: always
     depends_on:
-      perfiles-db:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - perfiles-db
+      - rabbitmq
     environment:
       PORT: 8085
       DB_HOST: perfiles-db
@@ -265,10 +256,8 @@ services:
     build: ./Reto4/auth-service
     restart: always
     depends_on:
-      db-auth:
-        condition: service_healthy
-      rabbitmq:
-        condition: service_healthy
+      - db-auth
+      - rabbitmq
     environment:
       PORT: 3001
       DATABASE_URL: postgres://postgres:postgres@db-auth:5432/auth_db
@@ -294,14 +283,10 @@ services:
     build: ./Reto4/api-gateway
     restart: always
     depends_on:
-      empleados-service:
-        condition: service_healthy
-      departamentos-service:
-        condition: service_healthy
-      perfiles-service:
-        condition: service_healthy
-      auth-service:
-        condition: service_healthy
+      - empleados-service
+      - departamentos-service
+      - perfiles-service
+      - auth-service
     environment:
       JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:

@@ -143,12 +143,17 @@ pipeline {
       steps {
         sh '''
           set -e
-          # No necesitamos mapear puertos al host durante el CI, usaremos la red interna
-          # Ignoramos healthchecks para evitar que el CI aborte si una DB tarda en responder
+          # Forzamos puerto 0 en todo para que Docker asigne puertos aleatorios
+          # y no choque con los servicios que tienes abiertos en tu PC
+          export DB_EMP_PORT=0 DB_DEP_PORT=0 DB_NOT_PORT=0 DB_PER_PORT=0 DB_AUTH_PORT=0
+          export EMP_SVC_PORT=0 DEP_SVC_PORT=0 NOT_SVC_PORT=0 PER_SVC_PORT=0 AUTH_SVC_PORT=0
+          export GATEWAY_PORT=0 RETO6_PORT=0 RABBIT_PORT=0 RABBIT_MGMT_PORT=0
+          export SONAR_PORT=0 JENKINS_PORT=0 JENKINS_AGENT_PORT=0
+
           docker-compose up -d --no-recreate database-empleados database-departamentos notification-db perfiles-db db-auth \
             rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway
           
-          echo "Esperando 60 segundos a que todo el ecosistema inicie..."
+          echo "Esperando 60 segundos a que el sistema se estabilice..."
           sleep 60
 
           # Ejecutar las pruebas ORIGINALES del Reto 5 contra el API Gateway interno
