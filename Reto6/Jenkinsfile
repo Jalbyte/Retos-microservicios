@@ -143,17 +143,23 @@ pipeline {
       steps {
         sh '''
           set -e
-          # Levantar TODO el sistema (microservicios del Reto 5)
-          docker-compose up -d
+          # Configurar puertos a 0 para que Docker elija puertos aleatorios y no choque con el host
+          export DB_EMP_PORT=0 DB_DEP_PORT=0 DB_NOT_PORT=0 DB_PER_PORT=0 DB_AUTH_PORT=0
+          export EMP_SVC_PORT=0 DEP_SVC_PORT=0 NOT_SVC_PORT=0 PER_SVC_PORT=0 AUTH_SVC_PORT=0
+          export GATEWAY_PORT=0 RETO6_PORT=0 RABBIT_PORT=0 RABBIT_MGMT_PORT=0
+          
+          # Levantar solo los microservicios necesarios (excluyendo infraestructura CI)
+          docker-compose up -d database-empleados database-departamentos notification-db perfiles-db db-auth \
+            rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway
           
           # Esperar a que el API Gateway esté listo
           echo "Esperando a que el sistema esté listo..."
-          sleep 30
+          sleep 45
 
           # Ejecutar las pruebas ORIGINALES del Reto 5
           docker run --rm \
             --network retos-microservicios_microservices-network \
-            -e TEST_BASE_URL=http://api_gateway:3000 \
+            -e TEST_BASE_URL=http://api-gateway:3000 \
             --volumes-from $JENKINS_CONTAINER \
             -w "$WORKSPACE/Reto5/e2e-tests" \
             node:20-slim sh -lc "npm install && npm test"

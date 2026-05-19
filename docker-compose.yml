@@ -10,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-camilo}
       POSTGRES_DB: ${POSTGRES_DB_EMPLEADOS:-empleados_db}
     ports:
-      - "5433:5432"
+      - "${DB_EMP_PORT:-5433}:5432"
     volumes:
       - empleados_data:/var/lib/postgresql/data
       - ./Reto1/gestion-empleados/init.sql:/docker-entrypoint-initdb.d/init.sql:Z
@@ -34,7 +34,7 @@ services:
       POSTGRES_PASSWORD: camilo
       POSTGRES_DB: departamentos_db
     ports:
-      - "5434:5432"
+      - "${DB_DEP_PORT:-5434}:5432"
     volumes:
       - departamentos_data:/var/lib/postgresql/data
       - ./Reto2/gestion-departamentos/init.sql:/docker-entrypoint-initdb.d/init.sql:Z
@@ -57,7 +57,7 @@ services:
       MYSQL_ROOT_PASSWORD: rootpassword
       MYSQL_DATABASE: notifications
     ports:
-      - "3306:3306"
+      - "${DB_NOT_PORT:-3306}:3306"
     volumes:
       - notifications_data:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
@@ -81,7 +81,7 @@ services:
       POSTGRES_PASSWORD: camilo
       POSTGRES_DB: perfiles_db
     ports:
-      - "5435:5432"
+      - "${DB_PER_PORT:-5435}:5432"
     volumes:
       - perfiles_data:/var/lib/postgresql/data
     healthcheck:
@@ -104,7 +104,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: auth_db
     ports:
-      - "5436:5432"
+      - "${DB_AUTH_PORT:-5436}:5432"
     volumes:
       - auth_data:/var/lib/postgresql/data
       - ./Reto4/auth-service/init.sql:/docker-entrypoint-initdb.d/init.sql:Z
@@ -139,7 +139,7 @@ services:
       RABBITMQ_URL: amqp://admin:admin@rabbitmq:5672
       JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:
-      - "8080:8080"
+      - "${EMP_SVC_PORT:-8080}:8080"
     healthcheck:
       test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8080/health" ]
       interval: 10s
@@ -163,7 +163,7 @@ services:
       DATABASE_URL: postgresql://camilo:camilo@database-departamentos:5432/departamentos_db?sslmode=disable
       JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:
-      - "8081:8081"
+      - "${DEP_SVC_PORT:-8081}:8081"
     healthcheck:
       test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8081/health" ]
       interval: 10s
@@ -180,8 +180,8 @@ services:
     image: rabbitmq:3-management
     restart: always
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "${RABBIT_PORT:-5672}:5672"
+      - "${RABBIT_MGMT_PORT:-15672}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: admin
       RABBITMQ_DEFAULT_PASS: admin
@@ -215,7 +215,7 @@ services:
       RABBITMQ_EXCHANGE: empleados_exchange
       JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:
-      - "8084:8084"
+      - "${NOT_SVC_PORT:-8084}:8084"
     healthcheck:
       test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8084/health" ]
       interval: 10s
@@ -248,7 +248,7 @@ services:
       RABBITMQ_EXCHANGE: empleados_exchange
       JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:
-      - "8085:8085"
+      - "${PER_SVC_PORT:-8085}:8085"
     healthcheck:
       test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8085/health" ]
       interval: 10s
@@ -277,7 +277,7 @@ services:
       RABBITMQ_EXCHANGE: empleados_exchange
       AUTH_EXCHANGE: auth_exchange
     ports:
-      - "3001:3001"
+      - "${AUTH_SVC_PORT:-3001}:3001"
     healthcheck:
       test: [ "CMD", "wget", "--spider", "-q", "http://localhost:3001/health" ]
       interval: 10s
@@ -305,7 +305,7 @@ services:
     environment:
       JWT_SECRET: super_secret_reto4_jwt_key_2026
     ports:
-      - "3000:3000"
+      - "${GATEWAY_PORT:-3000}:3000"
     networks:
       - microservices-network
 
@@ -356,7 +356,7 @@ services:
       SONAR_JDBC_USERNAME: sonar
       SONAR_JDBC_PASSWORD: sonar
     ports:
-      - "9000:9000"
+      - "${SONAR_PORT:-9000}:9000"
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_logs:/opt/sonarqube/logs
@@ -385,8 +385,8 @@ services:
       SONAR_HOST_URL: http://sonarqube:9000
       SONAR_TOKEN: squ_0963223b0daad7bb9cdf933394bfdff3d7737add
     ports:
-      - "9090:8080"
-      - "50000:50000"
+      - "${JENKINS_PORT:-9090}:8080"
+      - "${JENKINS_AGENT_PORT:-50000}:50000"
     volumes:
       - jenkins_home:/var/jenkins_home
       - /var/run/docker.sock:/var/run/docker.sock
