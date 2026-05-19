@@ -143,10 +143,10 @@ pipeline {
       steps {
         sh '''
           set -e
-          # Start necessary services for E2E
-          docker-compose up -d reto6-express-service
+          # Use a different port (8087) during CI to avoid conflict with local 8086
+          RETO6_PORT=8087 docker-compose up -d reto6-express-service
           
-          # Wait for service to be healthy (using service name as hostname)
+          # Wait for service to be healthy (hostname is service name, port is internal 8086)
           echo "Waiting for service to be healthy..."
           for i in $(seq 1 20); do
             if curl -s http://reto6-express-service:8086/health | grep -q "ok"; then

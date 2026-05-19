@@ -318,7 +318,7 @@ services:
     environment:
       PORT: 8086
     ports:
-      - "8086:8086"
+      - "${RETO6_PORT:-8086}:8086"
     healthcheck:
       test: [ "CMD", "wget", "--spider", "-q", "http://localhost:8086/health" ]
       interval: 10s
