@@ -143,21 +143,35 @@ pipeline {
       steps {
         sh '''
           set -e
-          # Forzamos puerto 0 en todo para que Docker asigne puertos aleatorios
-          # y no choque con los servicios que tienes abiertos en tu PC
+          # Limpiamos cualquier residuo previo y levantamos el stack
+          docker-compose down
+          
           export DB_EMP_PORT=0 DB_DEP_PORT=0 DB_NOT_PORT=0 DB_PER_PORT=0 DB_AUTH_PORT=0
           export EMP_SVC_PORT=0 DEP_SVC_PORT=0 NOT_SVC_PORT=0 PER_SVC_PORT=0 AUTH_SVC_PORT=0
           export GATEWAY_PORT=0 RETO6_PORT=0 RABBIT_PORT=0 RABBIT_MGMT_PORT=0
           export SONAR_PORT=0 JENKINS_PORT=0 JENKINS_AGENT_PORT=0
 
-          docker-compose up -d --no-recreate database-empleados database-departamentos notification-db perfiles-db db-auth \
+          docker-compose up -d database-empleados database-departamentos notification-db perfiles-db db-auth \
             rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway
           
-          echo "Esperando 90 segundos a que el sistema se estabilice totalmente..."
-          sleep 90
+          echo "Esperando a que el API Gateway responda (Health Check)..."
+          for i in {1..30}; do
+            if curl -s http://api-gateway:3000/health | grep -q "200" || curl -I -s http://api-gateway:3000/ | grep -q "200 OK"; then
+              echo "¡El sistema está listo!"
+              break
+            fi
+            echo "Intento $i: El sistema aún no responde. Esperando 5s..."
+            sleep 5
+            if [ $i -eq 30 ]; then
+              echo "Error: El sistema no arrancó a tiempo."
+              exit 1
+            fi
+          done
 
-          # Ejecutar las pruebas ORIGINALES del Reto 5 contra el API Gateway interno
-          # Pasamos todas las variables de entorno necesarias para los steps del Reto 5
+          # Tiempo extra para que los servicios de Java se registren en el Gateway
+          sleep 15
+
+          # Ejecutar las pruebas ORIGINALES del Reto 5
           docker run --rm \
             --network retos-microservicios_microservices-network \
             -e BASE_URL=http://api-gateway:3000 \
