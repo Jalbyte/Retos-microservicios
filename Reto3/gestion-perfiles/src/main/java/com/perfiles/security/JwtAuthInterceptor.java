@@ -80,7 +80,8 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         return path.equals("/health")
             || path.startsWith("/swagger-ui")
             || path.startsWith("/v3/api-docs")
-            || path.startsWith("/api-docs");
+            || path.startsWith("/api-docs")
+            || path.startsWith("/actuator");
     }
 
     private boolean isWriteMethod(String method) {

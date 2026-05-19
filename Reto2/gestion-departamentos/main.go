@@ -12,12 +12,12 @@ package main
 // @description Token JWT. Formato: 'Bearer {token}'
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
-	"log"
 	"math"
 	"net/http"
 	"os"
@@ -29,11 +29,50 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq" // Postgres driver
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"go.uber.org/zap"
+
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/zipkin"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/sdk/resource"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
 
 var db *sql.DB
+var logger *zap.Logger
+
+func initTracer() *sdktrace.TracerProvider {
+	zipkinURL := os.Getenv("OTEL_EXPORTER_ZIPKIN_ENDPOINT")
+	if zipkinURL == "" {
+		zipkinURL = "http://zipkin:9411/api/v2/spans"
+	}
+
+	serviceName := os.Getenv("OTEL_SERVICE_NAME")
+	if serviceName == "" {
+		serviceName = "departamentos-service"
+	}
+
+	exporter, err := zipkin.New(zipkinURL)
+	if err != nil {
+		logger.Fatal("failed to create zipkin exporter", zap.Error(err))
+	}
+
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String(serviceName),
+		)),
+	)
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}))
+	return tp
+}
 
 type Departamento struct {
 	ID          string `json:"id"`
@@ -134,6 +173,7 @@ func JWTMiddleware() gin.HandlerFunc {
 			healthPath = "/health"
 		}
 		if path == healthPath ||
+			path == "/metrics" ||
 			strings.HasPrefix(path, "/swagger/") ||
 			path == "/swagger" {
 			c.Next()
@@ -141,7 +181,7 @@ func JWTMiddleware() gin.HandlerFunc {
 		}
 
 		authHeader := c.GetHeader("Authorization")
-		log.Printf("DEBUG Authorization header: '%s'", authHeader)
+		logger.Debug("Authorization header", zap.String("header", authHeader))
 		if authHeader == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"status":    401,
@@ -218,10 +258,119 @@ func errorResponse(c *gin.Context, status int, message string, errors []ErrorDet
 	})
 }
 
+func main() {
+	var err error
+	logger, err = zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+	defer logger.Sync()
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8081"
+	}
+
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		logger.Fatal("DATABASE_URL no está definida")
+	}
+
+	db, err = sql.Open("postgres", dbURL)
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(25)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	if err != nil {
+		logger.Fatal("Error al abrir db", zap.Error(err))
+	}
+
+	// Esperar a que la base esté lista
+	for i := 0; i < 10; i++ {
+		err = db.Ping()
+		if err == nil {
+			break
+		}
+
+		logger.Info("Esperando conexión a la base de datos...")
+		time.Sleep(3 * time.Second)
+	}
+
+	if err != nil {
+		logger.Fatal("No se pudo conectar a la base después de varios intentos", zap.Error(err))
+	}
+
+	defer db.Close()
+
+	tp := initTracer()
+	defer func() {
+		if err := tp.Shutdown(context.Background()); err != nil {
+			logger.Error("Error shutting down tracer provider", zap.Error(err))
+		}
+	}()
+
+	r := gin.Default()
+
+	serviceName := os.Getenv("OTEL_SERVICE_NAME")
+	if serviceName == "" {
+		serviceName = "departamentos-service"
+	}
+	r.Use(otelgin.Middleware(serviceName))
+
+	r.Use(DBMiddleware())
+	r.Use(JWTMiddleware()) // Add JWT middleware
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
+		ginSwagger.URL("/swagger/doc.json"),
+		ginSwagger.PersistAuthorization(true),
+	))
+	r.POST("/departamentos", RequireRole("ADMIN"), CreateDepartamento)
+	r.GET("/departamentos", GetDepartamentos)
+	r.GET("/departamentos/:id", GetDepartamentoByID)
+	r.Any("/health", health)
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	logger.Info("Servidor iniciado", zap.String("port", port), zap.String("service", serviceName))
+	r.Run(":" + port)
+}
+
+func health(c *gin.Context) {
+
+	if err := db.Ping(); err != nil {
+		logger.Error("Healthcheck fallido", zap.Error(err))
+		c.JSON(503, gin.H{
+			"status": "DOWN",
+			"error":  err.Error(),
+		})
+		return
+	}
+
+	c.JSON(200, gin.H{
+		"status": "UP",
+	})
+}
+
+func DBMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		// No aplicar middleware al health y metrics
+		path := c.Request.URL.Path
+		if path == "/health" || path == "/metrics" {
+			c.Next()
+			return
+		}
+
+		if err := ensureDBConnection(); err != nil {
+			logger.Error("Error en DBMiddleware", zap.Error(err))
+			errorResponse(c, 503, "Base de datos no disponible", nil)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 func ensureDBConnection() error {
 	if err := db.Ping(); err != nil {
 
-		log.Println("Conexión perdida. Intentando reconectar...")
+		logger.Info("Conexión perdida. Intentando reconectar...")
 
 		dbURL := os.Getenv("DATABASE_URL")
 
@@ -241,95 +390,10 @@ func ensureDBConnection() error {
 		}
 
 		db = newDB
-		log.Println("Reconexión exitosa a la base de datos")
+		logger.Info("Reconexión exitosa a la base de datos")
 	}
 
 	return nil
-}
-
-func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8081"
-	}
-
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		panic("DATABASE_URL no está definida")
-	}
-
-	var err error
-	db, err = sql.Open("postgres", dbURL)
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(25)
-	db.SetConnMaxLifetime(5 * time.Minute)
-	if err != nil {
-		panic(err)
-	}
-
-	// Esperar a que la base esté lista
-	for i := 0; i < 10; i++ {
-		err = db.Ping()
-		if err == nil {
-			break
-		}
-
-		log.Println("Esperando conexión a la base de datos...")
-		time.Sleep(3 * time.Second)
-	}
-
-	if err != nil {
-		panic("No se pudo conectar a la base después de varios intentos")
-	}
-
-	defer db.Close()
-
-	r := gin.Default()
-
-	r.Use(DBMiddleware())
-	r.Use(JWTMiddleware()) // Add JWT middleware
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler,
-		ginSwagger.URL("/swagger/doc.json"),
-		ginSwagger.PersistAuthorization(true),
-	))
-	r.POST("/departamentos", RequireRole("ADMIN"), CreateDepartamento)
-	r.GET("/departamentos", GetDepartamentos)
-	r.GET("/departamentos/:id", GetDepartamentoByID)
-	r.Any("/health", health)
-	r.Run(":" + port)
-}
-
-func health(c *gin.Context) {
-
-	if err := db.Ping(); err != nil {
-		c.JSON(503, gin.H{
-			"status": "DOWN",
-			"error":  err.Error(),
-		})
-		return
-	}
-
-	c.JSON(200, gin.H{
-		"status": "UP",
-	})
-}
-
-func DBMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-
-		// No aplicar middleware al health
-		if c.Request.URL.Path == "/health" {
-			c.Next()
-			return
-		}
-
-		if err := ensureDBConnection(); err != nil {
-			errorResponse(c, 503, "Base de datos no disponible", nil)
-			c.Abort()
-			return
-		}
-		c.Next()
-	}
 }
 
 //
@@ -380,6 +444,7 @@ func CreateDepartamento(c *gin.Context) {
 	)
 
 	if err != nil {
+		logger.Error("Error al insertar departamento", zap.Error(err), zap.String("id", dept.ID))
 		errorResponse(c, 409, "El departamento ya existe", []ErrorDetail{
 			{"id", "El id ya está registrado", dept.ID},
 		})
@@ -420,6 +485,7 @@ func GetDepartamentos(c *gin.Context) {
 	var totalElements int
 	err := db.QueryRow(`SELECT COUNT(*) FROM "Departamento"`).Scan(&totalElements)
 	if err != nil {
+		logger.Error("Error al contar departamentos", zap.Error(err))
 		errorResponse(c, 500, "Error al contar departamentos", nil)
 		return
 	}
@@ -429,6 +495,7 @@ func GetDepartamentos(c *gin.Context) {
 		size, offset,
 	)
 	if err != nil {
+		logger.Error("Error al consultar departamentos", zap.Error(err))
 		errorResponse(c, 500, "Error al consultar departamentos", nil)
 		return
 	}
@@ -485,6 +552,7 @@ func GetDepartamentoByID(c *gin.Context) {
 	}
 
 	if err != nil {
+		logger.Error("Error al obtener departamento por ID", zap.Error(err), zap.String("id", id))
 		errorResponse(c, 500, "Error interno", nil)
 		return
 	}
