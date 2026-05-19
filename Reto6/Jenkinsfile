@@ -157,9 +157,14 @@ pipeline {
           sleep 60
 
           # Ejecutar las pruebas ORIGINALES del Reto 5 contra el API Gateway interno
+          # Pasamos todas las variables de entorno necesarias para los steps del Reto 5
           docker run --rm \
             --network retos-microservicios_microservices-network \
-            -e TEST_BASE_URL=http://api-gateway:3000 \
+            -e BASE_URL=http://api-gateway:3000 \
+            -e ADMIN_EMAIL=admin@empresa.com \
+            -e ADMIN_PASSWORD=password \
+            -e USER_EMAIL=juan@empresa.com \
+            -e USER_PASSWORD=MiPass123 \
             --volumes-from $JENKINS_CONTAINER \
             -w "$WORKSPACE/Reto5/e2e-tests" \
             node:20-slim sh -lc "npm install && npm test"
