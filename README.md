@@ -76,6 +76,23 @@ Cobertura
 - Onboarding: Creación de empleado con propagación a Auth, Perfiles y notificaciones.
 - Offboarding: Desactivación de empleado con impacto en Auth y envío de notificación.
 
+### Observabilidad (Reto 7)
+El sistema cuenta con un stack completo de observabilidad para logs, métricas, trazas y alertas:
+
+- **Prometheus**: Métricas (puerto 9091)
+- **Grafana**: Dashboards y Alertas (puerto 3001)
+- **Loki**: Agregación de logs
+- **Zipkin**: Trazabilidad distribuida (puerto 9411)
+
+**Alertas:**
+- Se configuraron reglas de alerta para detectar:
+  1. Caída de servicios (`up == 0`).
+  2. Alta tasa de error HTTP (>10% de errores 5xx).
+- **Canal de notificación:** Se configuró un Webhook de Discord. Para configurar tu propio canal:
+  1. En Grafana > Alerting > Contact Points > New > Discord.
+  2. Pega tu Webhook URL del canal de Discord deseado.
+  3. Asegúrate de configurar la política de alerta en Alerting > Alert Rules.
+
 ### CI/CD
 
 - Jenkins: http://localhost:9090 (admin / admin123)
