@@ -4,7 +4,6 @@ services:
   # =========================
   database-empleados:
     image: postgres:15
-    container_name: empleados_db
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-camilo}
@@ -29,7 +28,6 @@ services:
   # =========================
   database-departamentos:
     image: postgres:15
-    container_name: departamentos_db
     restart: always
     environment:
       POSTGRES_USER: camilo
@@ -54,7 +52,6 @@ services:
   # =========================
   notification-db:
     image: mysql:8.0
-    container_name: notification_db
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: rootpassword
@@ -78,7 +75,6 @@ services:
   # =========================
   perfiles-db:
     image: postgres:15
-    container_name: perfiles_db
     restart: always
     environment:
       POSTGRES_USER: camilo
@@ -102,7 +98,6 @@ services:
   # =========================
   db-auth:
     image: postgres:15
-    container_name: auth_db
     restart: always
     environment:
       POSTGRES_USER: postgres
@@ -127,7 +122,6 @@ services:
   # =========================
   empleados-service:
     build: ./Reto1/gestion-empleados
-    container_name: empleados_api
     restart: always
     depends_on:
       database-empleados:
@@ -160,7 +154,6 @@ services:
   # =========================
   departamentos-service:
     build: ./Reto2/gestion-departamentos
-    container_name: departamentos_api
     restart: always
     depends_on:
       database-departamentos:
@@ -185,7 +178,6 @@ services:
   # =========================
   rabbitmq:
     image: rabbitmq:3-management
-    container_name: rabbitmq
     restart: always
     ports:
       - "5672:5672"
@@ -207,7 +199,6 @@ services:
   # =========================
   notificaciones-service:
     build: ./Reto3/servicio-notificaciones
-    container_name: notificaciones_api
     restart: always
     depends_on:
       notification-db:
@@ -239,7 +230,6 @@ services:
   # =========================
   perfiles-service:
     build: ./Reto3/gestion-perfiles
-    container_name: perfiles_api
     restart: always
     depends_on:
       perfiles-db:
@@ -273,7 +263,6 @@ services:
   # =========================
   auth-service:
     build: ./Reto4/auth-service
-    container_name: auth_api
     restart: always
     depends_on:
       db-auth:
@@ -303,7 +292,6 @@ services:
   # =========================
   api-gateway:
     build: ./Reto4/api-gateway
-    container_name: api_gateway
     restart: always
     depends_on:
       empleados-service:
@@ -326,7 +314,6 @@ services:
   # =========================
   reto6-express-service:
     build: ./Reto6
-    container_name: reto6_express_api
     restart: always
     environment:
       PORT: 8086
@@ -346,7 +333,6 @@ services:
   # =========================
   sonarqube-db:
     image: postgres:15
-    container_name: sonarqube_db
     restart: always
     environment:
       POSTGRES_USER: sonar
@@ -362,7 +348,6 @@ services:
   # =========================
   sonarqube:
     image: sonarqube:lts-community
-    container_name: sonarqube
     restart: always
     depends_on:
       - sonarqube-db
@@ -386,7 +371,6 @@ services:
     build:
       context: ./jenkins
       dockerfile: Dockerfile
-    container_name: jenkins_ci
     user: root
     restart: always
     depends_on:
