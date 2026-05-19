@@ -153,8 +153,8 @@ pipeline {
           docker-compose up -d --no-recreate database-empleados database-departamentos notification-db perfiles-db db-auth \
             rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway
           
-          echo "Esperando 60 segundos a que el sistema se estabilice..."
-          sleep 60
+          echo "Esperando 90 segundos a que el sistema se estabilice totalmente..."
+          sleep 90
 
           # Ejecutar las pruebas ORIGINALES del Reto 5 contra el API Gateway interno
           # Pasamos todas las variables de entorno necesarias para los steps del Reto 5
