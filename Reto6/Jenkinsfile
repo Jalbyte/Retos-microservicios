@@ -167,7 +167,7 @@ pipeline {
       }
       post {
         always {
-          docker-compose stop reto6-express-service
+          sh 'docker-compose stop reto6-express-service'
         }
       }
     }

@@ -12,6 +12,11 @@ jenkins:
     loggedInUsersCanDoAnything:
       allowAnonymousRead: false
 
+security:
+  crumbIssuer:
+    standard:
+      excludeClientIPFromCrumb: true
+
 unclassified:
   location:
     url: "http://localhost:9090/"
