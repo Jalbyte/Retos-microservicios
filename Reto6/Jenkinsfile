@@ -4,7 +4,7 @@ pipeline {
   environment {
     IMAGE_NAME = 'reto6-express-service'
     SONAR_HOST_URL = "${env.SONAR_HOST_URL ?: 'http://sonarqube:9000'}"
-    JENKINS_CONTAINER = 'jenkins_ci'
+    JENKINS_CONTAINER = 'retos-microservicios-jenkins-1'
   }
 
   options {
