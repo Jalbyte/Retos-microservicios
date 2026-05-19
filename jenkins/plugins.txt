@@ -1,3 +1,4 @@
+github
 workflow-aggregator
 git
 docker-workflow
