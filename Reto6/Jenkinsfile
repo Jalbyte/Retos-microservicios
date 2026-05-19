@@ -143,33 +143,37 @@ pipeline {
       steps {
         sh '''
           set -e
-          # Definimos los servicios del Reto 5
-          SERVICES="database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway"
+          INFRA="database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq"
+          SERVICES="auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway"
           
-          # Aseguramos que los puertos no choquen
           export DB_EMP_PORT=0 DB_DEP_PORT=0 DB_NOT_PORT=0 DB_PER_PORT=0 DB_AUTH_PORT=0
           export EMP_SVC_PORT=0 DEP_SVC_PORT=0 NOT_SVC_PORT=0 PER_SVC_PORT=0 AUTH_SVC_PORT=0
           export GATEWAY_PORT=0 RETO6_PORT=0 RABBIT_PORT=0 RABBIT_MGMT_PORT=0
           export SONAR_PORT=0 JENKINS_PORT=0 JENKINS_AGENT_PORT=0
 
-          # Reiniciamos solo los servicios de microservicios (SIN matar a Jenkins)
-          docker-compose stop $SERVICES || true
+          echo "Limpando entorno de pruebas..."
+          docker-compose stop $SERVICES $INFRA || true
+          docker-compose rm -f $SERVICES $INFRA || true
+          
+          echo "1. Levantando infraestructura (DBs y Mensajería)..."
+          docker-compose up -d $INFRA
+          sleep 20
+
+          echo "2. Levantando Microservicios..."
           docker-compose up -d $SERVICES
           
-          echo "Esperando a que los microservicios estén listos..."
-          # Esperar a que el Gateway responda con 200
+          echo "3. Verificando disponibilidad del sistema..."
           for i in {1..30}; do
             if curl -s http://api-gateway:3000/health | grep -q "200" || curl -I -s http://api-gateway:3000/ | grep -q "200 OK"; then
-              echo "¡API Gateway arriba!"
+              echo "¡API Gateway detectado!"
               break
             fi
-            echo "Intento $i: Gateway no responde. Esperando 5s..."
+            echo "Esperando Gateway (intento $i)..."
             sleep 5
           done
 
-          # Dar tiempo extra para que los servicios Java terminen de conectar con RabbitMQ y DB
-          echo "Dando 30s extra para estabilización interna..."
-          sleep 30
+          echo "4. Estabilización final de conexiones internas (RabbitMQ/Java)..."
+          sleep 45
 
           # Ejecutar las pruebas ORIGINALES del Reto 5
           docker run --rm \
