@@ -1,11 +1,26 @@
+require('./tracing');
+const logger = require('./logger');
 const express = require('express');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const cors = require('cors');
 const { createServiceProxy } = require('./utils/proxy');
+const client = require('prom-client');
 
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+// =========================
+// METRICS (PROMETHEUS)
+// =========================
+const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
+
 // =========================
 // IMPORT ROUTES
 // =========================
@@ -22,6 +37,14 @@ app.get('/', (req, res) => {
     status: 200,
     message: 'API Gateway levantada y funcionando correctamente',
     version: '1.0.0'
+  });
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'UP',
+    service: 'api-gateway',
+    timestamp: new Date().toISOString()
   });
 });
 
@@ -162,5 +185,5 @@ app.use((req, res) => {
 const PORT = 3000;
 
 app.listen(PORT, () => {
-  console.log(`API Gateway corriendo en puerto ${PORT}`);
+  logger.info(`API Gateway corriendo en puerto ${PORT}`);
 });
