@@ -5,7 +5,7 @@ pipeline {
     IMAGE_NAME = 'reto6-express-service'
     SONAR_HOST_URL = "${env.SONAR_HOST_URL ?: 'http://sonarqube:9000'}"
     JENKINS_CONTAINER = 'retos-microservicios-jenkins-1'
-    # Forzamos un nombre de proyecto fijo para las pruebas E2E
+    // Forzamos un nombre de proyecto fijo para las pruebas E2E
     E2E_PROJECT = 'reto6-e2e'
   }
 
@@ -149,8 +149,8 @@ pipeline {
           echo "Paso 4: Levantando microservicios..."
           docker-compose up -d $SERVICES
           
-          echo "Paso 5: Estabilización final (90s)..."
-          sleep 90
+          echo "Paso 5: Estabilización final (120s)..."
+          sleep 120
 
           echo "Paso 6: Ejecutando pruebas BDD..."
           docker run --rm \
