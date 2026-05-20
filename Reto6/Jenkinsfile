@@ -93,29 +93,18 @@ pipeline {
             sh '''
               set -e
               CE_TASK_URL=$(grep ceTaskUrl .scannerwork/report-task.txt | cut -d= -f2-)
-              
-              # Loop de espera compatible con todos los sistemas
-              for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
-                RESPONSE=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL")
-                STATUS=$(echo "$RESPONSE" | jq -r '.task.status')
-                echo "Intento $i: Estado de SonarQube es $STATUS"
-                
+              for i in 1 2 3 4 5 6 7 8 9 10; do
+                STATUS=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.status')
+                echo "Esperando SonarQube ($STATUS)..."
                 if [ "$STATUS" = "SUCCESS" ]; then
-                  ANALYSIS_ID=$(echo "$RESPONSE" | jq -r '.task.analysisId')
+                  ANALYSIS_ID=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.analysisId')
                   QG_STATUS=$(curl -s -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" | jq -r '.projectStatus.status')
-                  echo "Quality Gate Result: $QG_STATUS"
-                  if [ "$QG_STATUS" = "OK" ]; then exit 0; else exit 1; fi
+                  echo "Quality Gate: $QG_STATUS"
+                  [ "$QG_STATUS" = "OK" ]
+                  exit 0
                 fi
-                
-                if [ "$STATUS" = "FAILED" ] || [ "$STATUS" = "CANCELED" ]; then
-                  echo "Error: Analisis fallido en SonarQube"
-                  exit 1
-                fi
-                
                 sleep 10
               done
-              
-              echo "Timeout: SonarQube tardó demasiado"
               exit 1
             '''
           }
@@ -144,24 +133,29 @@ pipeline {
           export EMP_SVC_PORT=0 DEP_SVC_PORT=0 NOT_SVC_PORT=0 PER_SVC_PORT=0 AUTH_SVC_PORT=0
           export GATEWAY_PORT=0 RETO6_PORT=0 RABBIT_PORT=0 RABBIT_MGMT_PORT=0
 
-          echo "Reiniciando entorno de microservicios..."
+          echo "Paso 1: Limpiando contenedores..."
           docker-compose stop $SERVICES $INFRA || true
-          docker-compose rm -f -v $SERVICES $INFRA || true
+          docker-compose rm -f $SERVICES $INFRA || true
           
-          echo "1. Levantando infraestructura..."
+          echo "Paso 2: Levantando infraestructura (Bases de Datos)..."
           docker-compose up -d $INFRA
+          
+          echo "Paso 3: Esperando a que las DBs estén listas para recibir comandos..."
           sleep 20
 
-          echo "2. Levantando microservicios..."
+          echo "Paso 4: Creando tablas y datos semilla manualmente..."
+          # Usamos cat para enviar el init.sql directamente al contenedor de la DB
+          cat Reto2/gestion-departamentos/init.sql | docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db || true
+          # Insertar departamento 1 explícitamente sin comillas conflictivas
+          docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \\"Departamento\\" (id, nombre) VALUES ('1', 'Sistemas') ON CONFLICT DO NOTHING;"
+
+          echo "Paso 5: Levantando microservicios..."
           docker-compose up -d $SERVICES
           
-          echo "3. Esperando estabilización (120s)..."
-          sleep 120
+          echo "Paso 6: Estabilización final (60s)..."
+          sleep 60
 
-          echo "4. Inyectando datos semilla..."
-          docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \\"Departamento\\" (id, nombre) VALUES ('1', 'Talento Humano') ON CONFLICT DO NOTHING;"
-
-          echo "5. Ejecutando pruebas BDD..."
+          echo "Paso 7: Ejecutando pruebas BDD del Reto 5..."
           docker run --rm \
             --network retos-microservicios_microservices-network \
             -e BASE_URL=http://api-gateway:3000 \
