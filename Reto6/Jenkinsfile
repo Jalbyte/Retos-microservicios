@@ -92,38 +92,18 @@ pipeline {
           dir('Reto6') {
             sh '''
               set -e
-              # Polling for background task completion
               CE_TASK_URL=$(grep ceTaskUrl .scannerwork/report-task.txt | cut -d= -f2-)
-              echo "Checking task status at $CE_TASK_URL"
-              
-              for i in $(seq 1 30); do
-                TASK_RESPONSE=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL")
-                STATUS=$(echo "$TASK_RESPONSE" | jq -r '.task.status')
-                echo "Task status: $STATUS"
-                
+              for i in {1..30}; do
+                STATUS=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.status')
                 if [ "$STATUS" = "SUCCESS" ]; then
-                  ANALYSIS_ID=$(echo "$TASK_RESPONSE" | jq -r '.task.analysisId')
+                  ANALYSIS_ID=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.analysisId')
                   break
-                fi
-                if [ "$STATUS" = "FAILED" ]; then
-                  echo "SonarQube analysis failed"
-                  exit 1
                 fi
                 sleep 5
               done
-
-              if [ -z "$ANALYSIS_ID" ]; then
-                echo "Timeout waiting for SonarQube analysis"
-                exit 1
-              fi
-
               QG_STATUS=$(curl -s -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" | jq -r '.projectStatus.status')
-              echo "Quality Gate status: $QG_STATUS"
-              
-              if [ "$QG_STATUS" != "OK" ]; then
-                echo "Quality Gate failed: $QG_STATUS"
-                exit 1
-              fi
+              echo "Quality Gate: $QG_STATUS"
+              [ "$QG_STATUS" = "OK" ]
             '''
           }
         }
@@ -146,100 +126,29 @@ pipeline {
           set -e
           INFRA="database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq"
           SERVICES="auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway"
-          VOLUMES="empleados_data departamentos_data notifications_data perfiles_data auth_data"
           
-          # Puertos dinámicos para evitar colisiones
           export DB_EMP_PORT=0 DB_DEP_PORT=0 DB_NOT_PORT=0 DB_PER_PORT=0 DB_AUTH_PORT=0
           export EMP_SVC_PORT=0 DEP_SVC_PORT=0 NOT_SVC_PORT=0 PER_SVC_PORT=0 AUTH_SVC_PORT=0
           export GATEWAY_PORT=0 RETO6_PORT=0 RABBIT_PORT=0 RABBIT_MGMT_PORT=0
 
-          echo "Limpando entorno y volumenes para un estado fresco..."
-          docker-compose stop $SERVICES $INFRA 2>/dev/null || true
-          docker-compose rm -f -v $SERVICES $INFRA 2>/dev/null || true
+          echo "Reiniciando entorno de microservicios..."
+          docker-compose stop $SERVICES $INFRA || true
+          docker-compose rm -f -v $SERVICES $INFRA || true
           
-          echo "Levantando infraestructura..."
+          echo "1. Levantando infraestructura..."
           docker-compose up -d $INFRA
-          
-          echo "Esperando a que las bases de datos acepten conexiones..."
-          sleep 30
-          
-          echo "Verificando que las bases de datos estén listas..."
-          for i in $(seq 1 40); do
-            if docker-compose exec -T database-departamentos pg_isready -U camilo -d departamentos_db >/dev/null 2>&1 && \
-               docker-compose exec -T database-empleados pg_isready -U camilo -d empleados_db >/dev/null 2>&1 && \
-               docker-compose exec -T notification-db mysqladmin ping -h localhost -uroot -prootpassword >/dev/null 2>&1 && \
-               docker-compose exec -T rabbitmq rabbitmq-diagnostics ping >/dev/null 2>&1; then
-              echo "✓ Todas las bases de datos están listas"
-              break
-            fi
-            echo "  Intento $i/40: Esperando a las bases de datos..."
-            sleep 3
-          done
+          sleep 20
 
-          echo "Levantando microservicios..."
+          echo "2. Levantando microservicios..."
           docker-compose up -d $SERVICES
           
-          echo "Dando tiempo para que los servicios se inicialicen completamente (60s)..."
-          sleep 60
-          
-          echo "Verificando salud de cada componente..."
-          CHECK_SERVICES="api-gateway:3000 auth-service:3001 empleados-service:8080 departamentos-service:8081 perfiles-service:8085 notificaciones-service:8084"
-          
-          for svc in $CHECK_SERVICES; do
-            NAME=$(echo $svc | cut -d: -f1)
-            PORT=$(echo $svc | cut -d: -f2)
-            echo "Verificando salud de $NAME en puerto $PORT..."
-            READY=0
-            for i in $(seq 1 30); do
-              if curl -s -f http://$NAME:$PORT/health >/dev/null 2>&1 || curl -s -f http://$NAME:$PORT/ >/dev/null 2>&1; then
-                echo "✓ $NAME está OK en intento $i"
-                READY=1
-                break
-              fi
-              if [ $i -lt 30 ]; then
-                echo "  Intento $i/30: $NAME aún no responde, esperando..."
-                sleep 2
-              fi
-            done
-            if [ $READY -eq 0 ]; then
-              echo "⚠ ADVERTENCIA: $NAME no reportó salud después de 30 intentos, continuando de todas formas..."
-            fi
-          done
+          echo "3. Esperando estabilización (120s)..."
+          sleep 120
 
-          echo "Ejecutando init.sql manualmente para asegurar que los datos existan..."
-          cat Reto2/gestion-departamentos/init.sql | docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db 2>&1
-          sleep 2
+          echo "4. Inyectando datos semilla..."
+          docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \\"Departamento\\" (id, nombre) VALUES ('1', 'Talento Humano') ON CONFLICT DO NOTHING;"
 
-          echo "Verificando que el Departamento '1' existe en la BD..."
-          DEPT_VERIFIED=0
-          for i in $(seq 1 10); do
-            # Verificar que el departamento fue creado
-            RESULT=$(echo 'SELECT COUNT(*) FROM "Departamento" WHERE id='"'"'1'"'"';' | docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -t 2>&1)
-            # Limpiar resultado: eliminar espacios y caracteres de control, luego contar líneas con números
-            CLEAN_RESULT=$(echo "$RESULT" | grep -v '^ERROR' | grep -v '^LINE' | grep -v '^\^' | tr -d ' ')
-            COUNT=$(echo "$CLEAN_RESULT" | grep -oP '[0-9]+' | tail -1)
-            
-            if [ "$COUNT" = "1" ]; then
-              echo "✓ Departamento '1' verificado exitosamente (creado por init.sql)"
-              DEPT_VERIFIED=1
-              break
-            fi
-            
-            echo "  Intento $i/10: Departamento no encontrado aún, esperando..."
-            sleep 2
-          done
-          
-          if [ $DEPT_VERIFIED -eq 0 ]; then
-            echo "❌ ERROR: El Departamento '1' no existe en la BD"
-            echo "Esto sugiere que init.sql no se ejecutó correctamente"
-            exit 1
-          fi
-
-          echo "Esperando sincronización final de RabbitMQ y servicios (30s)..."
-          sleep 30
-
-          echo "Ejecutando pruebas E2E..."
-          # Ejecutar las pruebas ORIGINALES del Reto 5
+          echo "5. Ejecutando pruebas BDD..."
           docker run --rm \
             --network retos-microservicios_microservices-network \
             -e BASE_URL=http://api-gateway:3000 \
@@ -254,7 +163,7 @@ pipeline {
       }
       post {
         always {
-          sh 'docker-compose stop database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway 2>/dev/null || true'
+          sh 'docker-compose stop database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway || true'
         }
       }
     }
