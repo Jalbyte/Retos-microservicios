@@ -3,20 +3,16 @@ const logger = require('./logger');
 const express = require('express');
 const { authenticate, requireRole } = require('./middleware/auth');
 const cors = require('cors');
-const client = require('prom-client');
+const { metricsMiddleware, metricsEndpoint } = require('./metrics');
+
 // Cargar variables de entorno
 const app = express();
 app.use(express.json());
 app.use(cors());
+app.use(metricsMiddleware);
 
 // ─── Metrics (Prometheus) ───────────────────────────────────────────────────
-const register = new client.Registry();
-client.collectDefaultMetrics({ register });
-
-app.get('/metrics', async (req, res) => {
-  res.set('Content-Type', register.contentType);
-  res.end(await register.metrics());
-});
+app.get('/metrics', metricsEndpoint);
 
 const { Pool } = require('pg');
 
