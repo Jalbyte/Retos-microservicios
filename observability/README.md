@@ -1,68 +1,128 @@
-# Documentación de Observabilidad - Reto 7
+# 📊 Reto 7: Observabilidad en Microservicios
 
-Este documento presenta la implementación del stack de observabilidad para nuestros microservicios. El objetivo principal fue dotar al sistema de capacidad para responder preguntas sobre su estado, comportamiento y trazabilidad ante fallos.
-
----
-
-## 1. Arquitectura del Stack
-
-Hemos implementado un stack de observabilidad, orquestado mediante Docker Compose y totalmente integrado con la red `microservices-network`.
-
-| Componente | Función |
-|------------|----------|
-| **Prometheus** | Recolección de métricas (modelo Pull). |
-| **Grafana** | Visualización (Dashboards) y Alertas proactivas. |
-| **Loki** | Agregación centralizada de logs. |
-| **Promtail** | Agente de envío de logs hacia Loki. |
-| **Zipkin** | Trazabilidad distribuida (seguimiento de peticiones). |
+Este repositorio contiene la implementación completa de un stack de observabilidad para un ecosistema de microservicios heterogéneo.
 
 ---
 
-## 2. Patrones de Diseño Implementados
+## 1. Arquitectura de Observabilidad
 
-### A. Trazabilidad Distribuida (Distributed Tracing)
-Utilizamos **OpenTelemetry** para inyectar *Trace Contexts* en todas las cabeceras HTTP y eventos de RabbitMQ. Esto permite seguir el flujo completo de una solicitud (Gateway → Servicio Backend → Broker) a través de un `trace_id` único.
+El sistema utiliza un enfoque de **observabilidad en tres pilares** (Métricas, Logs y Trazas) diseñado para sistemas distribuidos.
 
-### B. Logging Estructurado (Structured Logging)
-Se reemplazaron los logs planos por **JSON estructurado** en todos los servicios (`Winston` para Node.js, `Logstash Encoder` para Java/Logback, `Zap` para Go). Cada entrada de log contiene:
-- `timestamp`
-- `level` (INFO, ERROR)
-- `service` (Nombre del servicio)
-- `trace_id` (vinculado a OTel)
+### Diagrama de Flujo
+```mermaid
+graph TD
+    subgraph "Microservicios"
+        A[API Gateway]
+        B[Auth Service]
+        C[Empleados Service]
+        D[Departamentos Service]
+        E[Notificaciones Service]
+        F[Perfiles Service]
+    end
 
-### C. Health Checks & Metrics
-Todos los servicios exponen endpoints estandarizados:
-- `/health`: Verificación de disponibilidad.
-- `/metrics` o `/actuator/prometheus`: Métricas en formato Prometheus (PromQL).
+    subgraph "Recolección (Metrics)"
+        G[Prometheus]
+        A -- Pull /metrics --> G
+        B -- Pull /metrics --> G
+        C -- Pull /metrics --> G
+        D -- Pull /metrics --> G
+        E -- Pull /actuator/prometheus --> G
+        F -- Pull /actuator/prometheus --> G
+    end
+
+    subgraph "Recolección (Logs)"
+        H[Promtail]
+        I[Loki]
+        A -- JSON Logs --> H
+        B -- JSON Logs --> H
+        H -- Push --> I
+    end
+
+    subgraph "Recolección (Tracing)"
+        J[Zipkin]
+        A -- OTel Span --> J
+        B -- OTel Span --> J
+        C -- OTel Span --> J
+    end
+
+    G --> K[Grafana]
+    I --> K
+    K --> L[Alertas - Discord]
+```
 
 ---
 
-## 3. Guía de Acceso a Servicios (URLs)
+## 2. Investigación de Conceptos Clave
 
-Para acceder a las herramientas, utiliza los siguientes puertos en `localhost`:
+### A. Pull vs. Push (Métricas)
+*   **Modelo Pull (Prometheus):** El servidor de métricas solicita los datos a los servicios. Es más fácil de escalar horizontalmente y no sobrecarga a los servicios si el recolector falla.
+*   **Modelo Push (InfluxDB/StatsD):** Los servicios envían proactivamente sus métricas. Útil para tareas efímeras (Serverless/Jobs) donde el servicio no vive lo suficiente para ser "scraped".
 
-| Servicio | URL | Credenciales |
-|----------|-----|--------------|
-| **Grafana** | [http://localhost:3001](http://localhost:3001) | admin / admin |
-| **Prometheus**| [http://localhost:9091](http://localhost:9091) | N/A |
-| **Zipkin** | [http://localhost:9411](http://localhost:9411) | N/A |
+### B. OpenTelemetry (OTel)
+Es un framework de observabilidad estándar de la industria (CNCF) que proporciona un conjunto único de APIs y bibliotecas para generar y recolectar trazas, métricas y logs sin depender de un proveedor específico (vendor-agnostic).
 
----
-
-## 4. Estrategia de Alertas
-
-Se ha configurado Grafana para monitoreo proactivo:
-1.  **Disponibilidad:** Alerta crítica si `up{job="<servicio>"} == 0` por más de 1 minuto.
-2.  **Salud del Sistema:** Alerta de alta tasa de errores si la suma de peticiones 5xx > 10% en un lapso de 2 minutos.
-
-*Las notificaciones están configuradas vía Webhook hacia un canal de Discord.*
+### C. W3C Trace Context
+Es un estándar que define campos HTTP universales (`traceparent`, `tracestate`) para propagar información de contexto de trazas entre servicios de diferentes lenguajes y proveedores, asegurando que el `trace-id` se mantenga idéntico en toda la cadena de llamadas.
 
 ---
 
-## 5. Análisis de Rendimiento
+## 3. Instrumentación por Servicio
 
-Para identificar cuellos de botella:
-1. Accede a **Zipkin** y realiza una búsqueda (`Run Query`).
-2. Identifica las peticiones con mayor "Duration".
-3. Examina la cascada de llamadas; los bloques más extensos visualmente corresponden a los servicios más lentos.
-4. Complementa esta información en el dashboard de **Grafana** bajo el panel "Average Latency" para identificar patrones de rendimiento a lo largo del tiempo.
+| Servicio | Lenguaje | Librería Métricas | Librería Trazabilidad |
+|----------|----------|-------------------|-----------------------|
+| **API Gateway** | Node.js | `prom-client` | `@opentelemetry/sdk-node` |
+| **Auth Service** | Node.js | `prom-client` | `@opentelemetry/sdk-node` |
+| **Empleados** | Node.js | `prom-client` | `@opentelemetry/sdk-node` |
+| **Departamentos**| Go | `client_golang` | `otelgo` |
+| **Notificaciones**| Java (Spring)| `Micrometer` | `otel-spring-boot-starter` |
+| **Perfiles** | Java (Spring)| `Micrometer` | `otel-spring-boot-starter` |
+
+---
+
+## 4. Justificación: Zipkin vs. Jaeger
+
+Hemos elegido **Zipkin** para este proyecto por las siguientes razones:
+1.  **Simplicidad:** Su configuración inicial es extremadamente sencilla con una sola imagen Docker.
+2.  **Compatibilidad:** Posee soporte nativo para los propagadores B3 y TraceContext, facilitando la integración con Spring Boot y Node.js.
+3.  **Recursos:** Consume menos memoria RAM que una instancia completa de Jaeger, lo cual es ideal para un entorno de desarrollo local con muchos microservicios.
+
+---
+
+## 5. Configuración de Alertas
+
+*   **Canal:** Webhook de Discord.
+*   **Configuración:**
+    1.  Se creó un servidor de Discord y un canal de `#alertas-sistema`.
+    2.  En Grafana, se añadió un **Contact Point** de tipo Discord pegando la URL del Webhook.
+    3.  Se definieron reglas de alerta en Grafana (Alert Rules) para detectar servicios caídos (`up == 0`).
+
+---
+
+## 6. Pruebas de Caos y Hallazgos
+
+### Capturas de Pantalla
+> *Las imágenes se encuentran en la carpeta `/observability/assets/`*
+
+1.  **Dashboard de Grafana - Salud:**
+    ![Grafana Dashboard](./assets/Metrics.png)
+
+2.  **Dashboard de Grafana - Infraestructura:**
+    ![Grafana Dashboard](./assets/Infra.png)
+
+3.  **Trazas en Zipkin (Cascada completa):**
+    ![Zipkin Traces](./assets/zipkin.png)
+4.  **Alerta recibida en Discord:**
+    ![Discord Alert](./assets/Alert.png)
+
+### Pregunta de Análisis
+**¿Qué servicio del ecosistema tardó más en responder y cómo lo identificaron?**
+
+**Respuesta:** El servicio que presentó mayor latencia fue el **`perfiles-service`** (Java/Spring Boot) durante las peticiones iniciales.
+**Evidencia:** Se identificó mediante el panel de **Average Latency** en Grafana, donde los picos iniciales superaban los 500ms, y se confirmó en **Zipkin**, observando que el span correspondiente al `perfiles-service` consumía el 70% del tiempo total de la transacción debido al tiempo de conexión inicial con la base de datos (Cold Start de JPA/Hibernate).
+
+---
+
+## 7. Cómo ejecutar
+1.  `docker compose up --build -d`
+2.  Ejecutar `./simulate_traffic.sh` para ver datos en vivo.
+3.  Acceder a Grafana en `http://localhost:3001` (admin/admin).
