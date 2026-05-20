@@ -11,48 +11,6 @@ El sistema utiliza un enfoque de **observabilidad en tres pilares** (Métricas, 
 ### Diagrama de Arquitectura
 ![Diagrama de Monitoreo de Microservicios](./assets/Microservices%20Monitoring-Diagram.png)
 
-### Diagrama de Flujo (Lógica Interna)
-```mermaid
-graph TD
-    subgraph "Microservicios"
-        A[API Gateway]
-        B[Auth Service]
-        C[Empleados Service]
-        D[Departamentos Service]
-        E[Notificaciones Service]
-        F[Perfiles Service]
-    end
-
-    subgraph "Recolección (Metrics)"
-        G[Prometheus]
-        A -- Pull /metrics --> G
-        B -- Pull /metrics --> G
-        C -- Pull /metrics --> G
-        D -- Pull /metrics --> G
-        E -- Pull /actuator/prometheus --> G
-        F -- Pull /actuator/prometheus --> G
-    end
-
-    subgraph "Recolección (Logs)"
-        H[Promtail]
-        I[Loki]
-        A -- JSON Logs --> H
-        B -- JSON Logs --> H
-        H -- Push --> I
-    end
-
-    subgraph "Recolección (Tracing)"
-        J[Zipkin]
-        A -- OTel Span --> J
-        B -- OTel Span --> J
-        C -- OTel Span --> J
-    end
-
-    G --> K[Grafana]
-    I --> K
-    K --> L[Alertas - Discord]
-```
-
 ---
 
 ## 2. Investigación de Conceptos Clave
