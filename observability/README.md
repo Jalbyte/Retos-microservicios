@@ -8,7 +8,10 @@ Este repositorio contiene la implementación completa de un stack de observabili
 
 El sistema utiliza un enfoque de **observabilidad en tres pilares** (Métricas, Logs y Trazas) diseñado para sistemas distribuidos.
 
-### Diagrama de Flujo
+### Diagrama de Arquitectura
+![Diagrama de Monitoreo de Microservicios](./assets/Microservices%20Monitoring-Diagram.png)
+
+### Diagrama de Flujo (Lógica Interna)
 ```mermaid
 graph TD
     subgraph "Microservicios"
