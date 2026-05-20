@@ -209,8 +209,8 @@ pipeline {
           echo "Verificando que el Departamento '1' existe en la BD..."
           DEPT_VERIFIED=0
           for i in $(seq 1 10); do
-            # Verificar que el departamento fue creado por init.sql
-            RESULT=$(docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -t -c "SELECT COUNT(*) FROM \"Departamento\" WHERE id='1';" 2>&1)
+            # Verificar que el departamento fue creado por init.sql (usando pipe para evitar escaping)
+            RESULT=$(echo 'SELECT COUNT(*) FROM "Departamento" WHERE id='"'"'1'"'"';' | docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -t 2>&1)
             COUNT=$(echo "$RESULT" | tr -d ' ' | grep -oP '[0-9]+' | head -1)
             
             if [ "$COUNT" = "1" ]; then
