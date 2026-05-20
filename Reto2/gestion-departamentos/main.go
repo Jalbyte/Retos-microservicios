@@ -29,6 +29,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq" // Postgres driver
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -43,8 +44,41 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
 
-var db *sql.DB
-var logger *zap.Logger
+var (
+	db     *sql.DB
+	logger *zap.Logger
+
+	// Histograma para métricas de negocio
+	httpDuration = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name:    "http_request_duration_seconds",
+		Help:    "Duration of HTTP requests in seconds",
+		Buckets: []float64{0.1, 0.3, 0.5, 0.7, 1, 3, 5, 7, 10},
+	}, []string{"method", "path", "status"})
+)
+
+func init() {
+	// Registrar métricas
+	prometheus.MustRegister(httpDuration)
+}
+
+// PrometheusMiddleware intercepta las peticiones y registra la duración
+func PrometheusMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		start := time.Now()
+		path := c.FullPath()
+		if path == "" {
+			path = c.Request.URL.Path
+		}
+
+		c.Next()
+
+		if path != "/metrics" && path != "/health" {
+			duration := time.Since(start).Seconds()
+			status := strconv.Itoa(c.Writer.Status())
+			httpDuration.WithLabelValues(c.Request.Method, path, status).Observe(duration)
+		}
+	}
+}
 
 func initTracer() *sdktrace.TracerProvider {
 	zipkinURL := os.Getenv("OTEL_EXPORTER_ZIPKIN_ENDPOINT")
@@ -315,6 +349,7 @@ func main() {
 		serviceName = "departamentos-service"
 	}
 	r.Use(otelgin.Middleware(serviceName))
+	r.Use(PrometheusMiddleware()) // Middleware para métricas de negocio
 
 	r.Use(DBMiddleware())
 	r.Use(JWTMiddleware()) // Add JWT middleware
@@ -524,13 +559,11 @@ func GetDepartamentos(c *gin.Context) {
 	c.JSON(http.StatusOK, response)
 }
 
-// GetDepartamentoByID godoc
+// GetDepartamentoByID obtiene un departamento por su ID
 // @Summary Obtener departamento por ID
-// @Description Obtiene un departamento específico por su ID
+// @Description Obtiene los detalles de un departamento específico usando su ID
 // @Tags Departamentos
-// @Security BearerToken
-// @Produce json
-// @Param id path string true "ID del departamento"
+// @Param id path string true "ID del Departamento"
 // @Success 200 {object} Departamento
 // @Failure 404 {object} ErrorResponse
 // @Failure 500 {object} ErrorResponse
