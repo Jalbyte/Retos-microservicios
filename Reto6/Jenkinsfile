@@ -206,30 +206,27 @@ pipeline {
             fi
           done
 
-          echo "Asegurando que el Departamento '1' existe en la BD..."
-          DEPT_INSERTED=0
+          echo "Verificando que el Departamento '1' existe en la BD..."
+          DEPT_VERIFIED=0
           for i in $(seq 1 10); do
-            # Intentar inserción y capturar salida
-            INSERT_OUTPUT=$(docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \"Departamento\" (id, nombre, descripcion) VALUES ('1', 'Talento Humano', 'Departamento de recursos humanos') ON CONFLICT (id) DO NOTHING;" 2>&1)
-            
-            # Verificar que la inserción fue exitosa consultando la BD
-            VERIFY_OUTPUT=$(docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -t -c "SELECT COUNT(*) FROM \"Departamento\" WHERE id='1';" 2>&1)
-            
-            # Limpiar espacios en blanco y verificar resultado
-            COUNT=$(echo "$VERIFY_OUTPUT" | tr -d ' ' | grep -oP '[0-9]+' | head -1)
+            # Verificar que el departamento fue creado por init.sql
+            RESULT=$(docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -t -c "SELECT COUNT(*) FROM \"Departamento\" WHERE id='1';" 2>&1)
+            COUNT=$(echo "$RESULT" | tr -d ' ' | grep -oP '[0-9]+' | head -1)
             
             if [ "$COUNT" = "1" ]; then
-              echo "✓ Departamento '1' insertado y verificado exitosamente en intento $i"
-              DEPT_INSERTED=1
+              echo "✓ Departamento '1' verificado exitosamente (creado por init.sql)"
+              DEPT_VERIFIED=1
               break
             fi
             
-            echo "  Intento $i/10: Tabla aún no lista, esperando..."
+            echo "  Intento $i/10: Departamento no encontrado aún, esperando..."
             sleep 2
           done
           
-          if [ $DEPT_INSERTED -eq 0 ]; then
-            echo "⚠ ADVERTENCIA: No se pudo insertar el Departamento '1', pero continuando..."
+          if [ $DEPT_VERIFIED -eq 0 ]; then
+            echo "❌ ERROR: El Departamento '1' no existe en la BD"
+            echo "Esto sugiere que init.sql no se ejecutó correctamente"
+            exit 1
           fi
 
           echo "Esperando sincronización final de RabbitMQ y servicios (30s)..."
