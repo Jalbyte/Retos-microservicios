@@ -7,7 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const cors = require('cors');
-const client = require('prom-client');
+const { metricsMiddleware, metricsEndpoint } = require('./metrics');
 
 const pool = require('./db');
 const { connectRabbit, publishToAuth, setEventHandler } = require('./rabbitmq');
@@ -15,15 +15,10 @@ const { connectRabbit, publishToAuth, setEventHandler } = require('./rabbitmq');
 const app = express();
 app.use(express.json());
 app.use(cors());
+app.use(metricsMiddleware);
 
 // ─── Metrics (Prometheus) ───────────────────────────────────────────────────
-const register = new client.Registry();
-client.collectDefaultMetrics({ register });
-
-app.get('/metrics', async (req, res) => {
-  res.set('Content-Type', register.contentType);
-  res.end(await register.metrics());
-});
+app.get('/metrics', metricsEndpoint);
 
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET;
