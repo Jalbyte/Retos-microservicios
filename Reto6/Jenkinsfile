@@ -76,6 +76,7 @@ pipeline {
                 -Dsonar.projectKey=reto6-express-service \
                 -Dsonar.projectName="Reto 6 Express Service" \
                 -Dsonar.sources=. \
+                -Dsonar.exclusions="node_modules/**,coverage/**,server.js,logger.js,tracing.js" \
                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                 -Dsonar.host.url=$SONAR_HOST_URL \
                 -Dsonar.token=$SONAR_TOKEN \
