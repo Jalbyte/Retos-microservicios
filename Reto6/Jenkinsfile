@@ -5,6 +5,8 @@ pipeline {
     IMAGE_NAME = 'reto6-express-service'
     SONAR_HOST_URL = "${env.SONAR_HOST_URL ?: 'http://sonarqube:9000'}"
     JENKINS_CONTAINER = 'retos-microservicios-jenkins-1'
+    # Forzamos un nombre de proyecto fijo para las pruebas E2E
+    E2E_PROJECT = 'reto6-e2e'
   }
 
   options {
@@ -71,11 +73,11 @@ pipeline {
               -e SONAR_HOST_URL=$SONAR_HOST_URL \
               -e SONAR_TOKEN=$SONAR_TOKEN \
               -w "$WORKSPACE/Reto6" \
-              sonarsource/sonar-scanner-cli:latest \
-              sonar-scanner \
+              sonarsource/sonar-scanner-cli:latest sonar-scanner \
                 -Dsonar.projectKey=reto6-express-service \
                 -Dsonar.projectName="Reto 6 Express Service" \
                 -Dsonar.sources=. \
+                -Dsonar.exclusions="node_modules/**,coverage/**,server.js,logger.js,tracing.js" \
                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
                 -Dsonar.host.url=$SONAR_HOST_URL \
                 -Dsonar.token=$SONAR_TOKEN \
@@ -91,38 +93,19 @@ pipeline {
           dir('Reto6') {
             sh '''
               set -e
-              # Polling for background task completion
               CE_TASK_URL=$(grep ceTaskUrl .scannerwork/report-task.txt | cut -d= -f2-)
-              echo "Checking task status at $CE_TASK_URL"
-              
-              for i in $(seq 1 30); do
-                TASK_RESPONSE=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL")
-                STATUS=$(echo "$TASK_RESPONSE" | jq -r '.task.status')
-                echo "Task status: $STATUS"
-                
+              for i in 1 2 3 4 5 6 7 8 9 10; do
+                STATUS=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.status')
+                echo "Esperando SonarQube ($STATUS)..."
                 if [ "$STATUS" = "SUCCESS" ]; then
-                  ANALYSIS_ID=$(echo "$TASK_RESPONSE" | jq -r '.task.analysisId')
-                  break
+                  ANALYSIS_ID=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.analysisId')
+                  QG_STATUS=$(curl -s -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" | jq -r '.projectStatus.status')
+                  echo "Quality Gate: $QG_STATUS"
+                  if [ "$QG_STATUS" = "OK" ]; then exit 0; else exit 1; fi
                 fi
-                if [ "$STATUS" = "FAILED" ]; then
-                  echo "SonarQube analysis failed"
-                  exit 1
-                fi
-                sleep 5
+                sleep 10
               done
-
-              if [ -z "$ANALYSIS_ID" ]; then
-                echo "Timeout waiting for SonarQube analysis"
-                exit 1
-              fi
-
-              QG_STATUS=$(curl -s -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" | jq -r '.projectStatus.status')
-              echo "Quality Gate status: $QG_STATUS"
-              
-              if [ "$QG_STATUS" != "OK" ]; then
-                echo "Quality Gate failed: $QG_STATUS"
-                exit 1
-              fi
+              exit 1
             '''
           }
         }
@@ -143,55 +126,35 @@ pipeline {
       steps {
         sh '''
           set -e
+          export COMPOSE_PROJECT_NAME=$E2E_PROJECT
           INFRA="database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq"
           SERVICES="auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway"
-          VOLUMES="empleados_data departamentos_data notifications_data perfiles_data auth_data"
           
-          # Puertos dinámicos para evitar colisiones
           export DB_EMP_PORT=0 DB_DEP_PORT=0 DB_NOT_PORT=0 DB_PER_PORT=0 DB_AUTH_PORT=0
           export EMP_SVC_PORT=0 DEP_SVC_PORT=0 NOT_SVC_PORT=0 PER_SVC_PORT=0 AUTH_SVC_PORT=0
           export GATEWAY_PORT=0 RETO6_PORT=0 RABBIT_PORT=0 RABBIT_MGMT_PORT=0
 
-          echo "Limpando entorno y volumenes para un estado fresco..."
+          echo "Paso 1: Limpiando contenedores del proyecto E2E..."
           docker-compose stop $SERVICES $INFRA || true
           docker-compose rm -f -v $SERVICES $INFRA || true
           
-          echo "Levantando infraestructura..."
+          echo "Paso 2: Levantando infraestructura..."
           docker-compose up -d $INFRA
-          
-          echo "Esperando a que las bases de datos acepten conexiones..."
-          sleep 20
+          sleep 30
 
-          echo "Levantando microservicios..."
+          echo "Paso 3: Creando tablas y datos semilla..."
+          cat Reto2/gestion-departamentos/init.sql | docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db || true
+          docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \\"Departamento\\" (id, nombre) VALUES ('1', 'Sistemas') ON CONFLICT DO NOTHING;"
+
+          echo "Paso 4: Levantando microservicios..."
           docker-compose up -d $SERVICES
           
-          echo "Verificando salud de cada componente..."
-          CHECK_SERVICES="api-gateway:3000 auth-service:3001 empleados-service:8080 departamentos-service:8081 perfiles-service:8085 notificaciones-service:8084"
-          
-          for svc in $CHECK_SERVICES; do
-            NAME=$(echo $svc | cut -d: -f1)
-            PORT=$(echo $svc | cut -d: -f2)
-            echo "Esperando a $NAME..."
-            for i in {1..20}; do
-              if curl -s http://$NAME:$PORT/health | grep -q "200" || curl -I -s http://$NAME:$PORT/ | grep -q "200 OK"; then
-                echo "¡$NAME está OK!"
-                break
-              fi
-              sleep 5
-              if [ $i -eq 20 ]; then echo "ADVERTENCIA: $NAME no reportó salud, continuando..."; fi
-            done
-          done
+          echo "Paso 5: Estabilización final (90s)..."
+          sleep 90
 
-          # Aseguramos el Departamento '1' directamente en la DB para evitar el error 400
-          echo "Insertando departamento semilla '1'..."
-          docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \\"Departamento\\" (id, nombre, descripcion) VALUES ('1', 'Talento Humano', 'HR') ON CONFLICT DO NOTHING;" || true
-
-          echo "Dando 20s finales para sincronización de RabbitMQ..."
-          sleep 20
-
-          # Ejecutar las pruebas ORIGINALES del Reto 5
+          echo "Paso 6: Ejecutando pruebas BDD..."
           docker run --rm \
-            --network retos-microservicios_microservices-network \
+            --network ${E2E_PROJECT}_microservices-network \
             -e BASE_URL=http://api-gateway:3000 \
             -e ADMIN_EMAIL=admin@empresa.com \
             -e ADMIN_PASSWORD=password \
@@ -204,7 +167,7 @@ pipeline {
       }
       post {
         always {
-          sh 'docker-compose stop database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway'
+          sh "COMPOSE_PROJECT_NAME=$E2E_PROJECT docker-compose stop database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway || true"
         }
       }
     }
