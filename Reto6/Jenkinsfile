@@ -5,6 +5,8 @@ pipeline {
     IMAGE_NAME = 'reto6-express-service'
     SONAR_HOST_URL = "${env.SONAR_HOST_URL ?: 'http://sonarqube:9000'}"
     JENKINS_CONTAINER = 'retos-microservicios-jenkins-1'
+    # Forzamos un nombre de proyecto fijo para las pruebas E2E
+    E2E_PROJECT = 'reto6-e2e'
   }
 
   options {
@@ -71,8 +73,7 @@ pipeline {
               -e SONAR_HOST_URL=$SONAR_HOST_URL \
               -e SONAR_TOKEN=$SONAR_TOKEN \
               -w "$WORKSPACE/Reto6" \
-              sonarsource/sonar-scanner-cli:latest \
-              sonar-scanner \
+              sonarsource/sonar-scanner-cli:latest sonar-scanner \
                 -Dsonar.projectKey=reto6-express-service \
                 -Dsonar.projectName="Reto 6 Express Service" \
                 -Dsonar.sources=. \
@@ -100,8 +101,7 @@ pipeline {
                   ANALYSIS_ID=$(curl -s -u "$SONAR_TOKEN:" "$CE_TASK_URL" | jq -r '.task.analysisId')
                   QG_STATUS=$(curl -s -u "$SONAR_TOKEN:" "$SONAR_HOST_URL/api/qualitygates/project_status?analysisId=$ANALYSIS_ID" | jq -r '.projectStatus.status')
                   echo "Quality Gate: $QG_STATUS"
-                  [ "$QG_STATUS" = "OK" ]
-                  exit 0
+                  if [ "$QG_STATUS" = "OK" ]; then exit 0; else exit 1; fi
                 fi
                 sleep 10
               done
@@ -126,6 +126,7 @@ pipeline {
       steps {
         sh '''
           set -e
+          export COMPOSE_PROJECT_NAME=$E2E_PROJECT
           INFRA="database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq"
           SERVICES="auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway"
           
@@ -133,31 +134,27 @@ pipeline {
           export EMP_SVC_PORT=0 DEP_SVC_PORT=0 NOT_SVC_PORT=0 PER_SVC_PORT=0 AUTH_SVC_PORT=0
           export GATEWAY_PORT=0 RETO6_PORT=0 RABBIT_PORT=0 RABBIT_MGMT_PORT=0
 
-          echo "Paso 1: Limpiando contenedores..."
+          echo "Paso 1: Limpiando contenedores del proyecto E2E..."
           docker-compose stop $SERVICES $INFRA || true
-          docker-compose rm -f $SERVICES $INFRA || true
+          docker-compose rm -f -v $SERVICES $INFRA || true
           
-          echo "Paso 2: Levantando infraestructura (Bases de Datos)..."
+          echo "Paso 2: Levantando infraestructura..."
           docker-compose up -d $INFRA
-          
-          echo "Paso 3: Esperando a que las DBs estén listas para recibir comandos..."
-          sleep 20
+          sleep 30
 
-          echo "Paso 4: Creando tablas y datos semilla manualmente..."
-          # Usamos cat para enviar el init.sql directamente al contenedor de la DB
+          echo "Paso 3: Creando tablas y datos semilla..."
           cat Reto2/gestion-departamentos/init.sql | docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db || true
-          # Insertar departamento 1 explícitamente sin comillas conflictivas
           docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \\"Departamento\\" (id, nombre) VALUES ('1', 'Sistemas') ON CONFLICT DO NOTHING;"
 
-          echo "Paso 5: Levantando microservicios..."
+          echo "Paso 4: Levantando microservicios..."
           docker-compose up -d $SERVICES
           
-          echo "Paso 6: Estabilización final (60s)..."
-          sleep 60
+          echo "Paso 5: Estabilización final (90s)..."
+          sleep 90
 
-          echo "Paso 7: Ejecutando pruebas BDD del Reto 5..."
+          echo "Paso 6: Ejecutando pruebas BDD..."
           docker run --rm \
-            --network retos-microservicios_microservices-network \
+            --network ${E2E_PROJECT}_microservices-network \
             -e BASE_URL=http://api-gateway:3000 \
             -e ADMIN_EMAIL=admin@empresa.com \
             -e ADMIN_PASSWORD=password \
@@ -170,7 +167,7 @@ pipeline {
       }
       post {
         always {
-          sh 'docker-compose stop database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway || true'
+          sh "COMPOSE_PROJECT_NAME=$E2E_PROJECT docker-compose stop database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway || true"
         }
       }
     }
