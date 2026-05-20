@@ -206,12 +206,18 @@ pipeline {
             fi
           done
 
+          echo "Ejecutando init.sql manualmente para asegurar que los datos existan..."
+          cat Reto2/gestion-departamentos/init.sql | docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db 2>&1
+          sleep 2
+
           echo "Verificando que el Departamento '1' existe en la BD..."
           DEPT_VERIFIED=0
           for i in $(seq 1 10); do
-            # Verificar que el departamento fue creado por init.sql (usando pipe para evitar escaping)
+            # Verificar que el departamento fue creado
             RESULT=$(echo 'SELECT COUNT(*) FROM "Departamento" WHERE id='"'"'1'"'"';' | docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -t 2>&1)
-            COUNT=$(echo "$RESULT" | tr -d ' ' | grep -oP '[0-9]+' | head -1)
+            # Limpiar resultado: eliminar espacios y caracteres de control, luego contar líneas con números
+            CLEAN_RESULT=$(echo "$RESULT" | grep -v '^ERROR' | grep -v '^LINE' | grep -v '^\^' | tr -d ' ')
+            COUNT=$(echo "$CLEAN_RESULT" | grep -oP '[0-9]+' | tail -1)
             
             if [ "$COUNT" = "1" ]; then
               echo "✓ Departamento '1' verificado exitosamente (creado por init.sql)"
