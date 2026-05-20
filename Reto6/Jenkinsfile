@@ -114,7 +114,9 @@ pipeline {
       steps {
         dir('Reto6') {
           sh '''
-            export DOCKER_BUILDKIT=1
+            echo "Construyendo imagen con el motor estándar de Docker..."
+            # Forzamos el uso del builder clásico para evitar el error de buildx
+            export DOCKER_BUILDKIT=0
             docker build -t $IMAGE_NAME:$BUILD_NUMBER -t $IMAGE_NAME:latest .
           '''
         }
