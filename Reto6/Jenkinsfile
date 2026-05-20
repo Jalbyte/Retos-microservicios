@@ -207,15 +207,29 @@ pipeline {
           done
 
           echo "Asegurando que el Departamento '1' existe en la BD..."
-          for i in $(seq 1 5); do
-            if docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \\"Departamento\\" (id, nombre, descripcion) VALUES ('1', 'Talento Humano', 'Departamento de recursos humanos') ON CONFLICT DO NOTHING;" 2>/dev/null; then
-              echo "✓ Departamento insertado/verificado exitosamente"
-              break
-            else
-              echo "  Intento $i/5: Esperando a que la tabla esté lista..."
-              sleep 3
+          DEPT_INSERTED=0
+          for i in $(seq 1 10); do
+            # Primero verificar que la tabla existe
+            if docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "\dt \\"Departamento\\"" 2>&1 | grep -q Departamento; then
+              echo "  ✓ Tabla Departamento existe en intento $i"
+              # Intentar insertar
+              if docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \\"Departamento\\" (id, nombre, descripcion) VALUES ('1', 'Talento Humano', 'Departamento de recursos humanos') ON CONFLICT (id) DO NOTHING;" 2>&1; then
+                # Verificar que la inserción fue exitosa
+                RESULT=$(docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -t -c "SELECT COUNT(*) FROM \\"Departamento\\" WHERE id='1';" 2>&1)
+                if echo "$RESULT" | grep -q "1"; then
+                  echo "✓ Departamento '1' insertado y verificado exitosamente"
+                  DEPT_INSERTED=1
+                  break
+                fi
+              fi
             fi
+            echo "  Intento $i/10: Esperando a que la tabla esté lista..."
+            sleep 2
           done
+          
+          if [ $DEPT_INSERTED -eq 0 ]; then
+            echo "⚠ ADVERTENCIA: No se pudo insertar el Departamento '1', pero continuando..."
+          fi
 
           echo "Esperando sincronización final de RabbitMQ y servicios (30s)..."
           sleep 30
