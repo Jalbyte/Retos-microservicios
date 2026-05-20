@@ -5,7 +5,6 @@ pipeline {
     IMAGE_NAME = 'reto6-express-service'
     SONAR_HOST_URL = "${env.SONAR_HOST_URL ?: 'http://sonarqube:9000'}"
     JENKINS_CONTAINER = 'retos-microservicios-jenkins-1'
-    // Forzamos un nombre de proyecto fijo para las pruebas E2E
     E2E_PROJECT = 'reto6-e2e'
   }
 
@@ -29,6 +28,7 @@ pipeline {
 
     stage('Checkout') {
       steps {
+        // Limpia de forma segura el workspace de Jenkins
         deleteDir()
         checkout scm
       }
@@ -79,8 +79,6 @@ pipeline {
                 -Dsonar.sources=. \
                 -Dsonar.exclusions="node_modules/**,coverage/**,server.js,logger.js,tracing.js" \
                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
-                -Dsonar.host.url=$SONAR_HOST_URL \
-                -Dsonar.token=$SONAR_TOKEN \
                 -Dsonar.working.directory=.scannerwork
           '''
         }
@@ -116,6 +114,7 @@ pipeline {
       steps {
         dir('Reto6') {
           sh '''
+            export DOCKER_BUILDKIT=1
             docker build -t $IMAGE_NAME:$BUILD_NUMBER -t $IMAGE_NAME:latest .
           '''
         }
@@ -126,6 +125,10 @@ pipeline {
       steps {
         sh '''
           set -e
+          echo "Garantizando limpieza absoluta del entorno..."
+          # Detiene tanto el entorno de desarrollo como el de pruebas anterior
+          docker-compose -f docker-compose.yml down --remove-orphans || true
+          
           export COMPOSE_PROJECT_NAME=$E2E_PROJECT
           INFRA="database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq"
           SERVICES="auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway"
@@ -133,18 +136,19 @@ pipeline {
           export DB_EMP_PORT=0 DB_DEP_PORT=0 DB_NOT_PORT=0 DB_PER_PORT=0 DB_AUTH_PORT=0
           export EMP_SVC_PORT=0 DEP_SVC_PORT=0 NOT_SVC_PORT=0 PER_SVC_PORT=0 AUTH_SVC_PORT=0
           export GATEWAY_PORT=0 RETO6_PORT=0 RABBIT_PORT=0 RABBIT_MGMT_PORT=0
+          export SONAR_PORT=0 JENKINS_PORT=0 JENKINS_AGENT_PORT=0
 
           echo "Paso 1: Limpiando contenedores del proyecto E2E..."
           docker-compose stop $SERVICES $INFRA || true
           docker-compose rm -f -v $SERVICES $INFRA || true
           
-          echo "Paso 2: Levantando infraestructura..."
+          echo "Paso 2: Levantando infraestructura de pruebas..."
           docker-compose up -d $INFRA
           sleep 30
 
           echo "Paso 3: Creando tablas y datos semilla..."
           cat Reto2/gestion-departamentos/init.sql | docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db || true
-          docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \\"Departamento\\" (id, nombre) VALUES ('1', 'Sistemas') ON CONFLICT DO NOTHING;"
+          docker-compose exec -T database-departamentos psql -U camilo -d departamentos_db -c "INSERT INTO \\"Departamento\\" (id, nombre) VALUES ('1', 'Talento Humano') ON CONFLICT DO NOTHING;"
 
           echo "Paso 4: Levantando microservicios..."
           docker-compose up -d $SERVICES
@@ -167,7 +171,7 @@ pipeline {
       }
       post {
         always {
-          sh "COMPOSE_PROJECT_NAME=$E2E_PROJECT docker-compose stop database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway || true"
+          sh "export COMPOSE_PROJECT_NAME=$E2E_PROJECT && docker-compose stop database-empleados database-departamentos notification-db perfiles-db db-auth rabbitmq auth-service perfiles-service notificaciones-service departamentos-service empleados-service api-gateway || true"
         }
       }
     }
