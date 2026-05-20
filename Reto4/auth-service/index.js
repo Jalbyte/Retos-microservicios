@@ -1,3 +1,5 @@
+require('./tracing');
+const logger = require('./logger');
 const express = require('express');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -5,6 +7,7 @@ const { v4: uuidv4 } = require('uuid');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const cors = require('cors');
+const client = require('prom-client');
 
 const pool = require('./db');
 const { connectRabbit, publishToAuth, setEventHandler } = require('./rabbitmq');
@@ -12,6 +15,15 @@ const { connectRabbit, publishToAuth, setEventHandler } = require('./rabbitmq');
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+// ─── Metrics (Prometheus) ───────────────────────────────────────────────────
+const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
+});
 
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -93,7 +105,7 @@ async function handleEmployeeEvent(event) {
          ON CONFLICT (email) DO NOTHING`,
         [email]
       );
-      console.log(`[EVENT] Usuario creado para: ${email}`);
+      logger.info(`[EVENT] Usuario creado para: ${email}`);
 
       // Generar token de reset y publicar usuario.creado
       const resetToken = signResetToken(email);
@@ -102,7 +114,7 @@ async function handleEmployeeEvent(event) {
         data: { email, token: resetToken },
       });
     } catch (err) {
-      console.error('[EVENT] Error procesando empleado.creado:', err.message);
+      logger.error(`[EVENT] Error procesando empleado.creado: ${err.message}`);
     }
   } else if (type === 'empleado.eliminado') {
     const { email } = data;
@@ -111,9 +123,9 @@ async function handleEmployeeEvent(event) {
         `UPDATE users SET enabled = false WHERE email = $1`,
         [email]
       );
-      console.log(`[EVENT] Usuario inhabilitado: ${email}`);
+      logger.info(`[EVENT] Usuario inhabilitado: ${email}`);
     } catch (err) {
-      console.error('[EVENT] Error procesando empleado.eliminado:', err.message);
+      logger.error(`[EVENT] Error procesando empleado.eliminado: ${err.message}`);
     }
   }
 }
@@ -207,7 +219,7 @@ app.post('/auth/login', async (req, res) => {
     const accessToken = signAccessToken(user.email, user.role);
     return res.json({ accessToken, tokenType: 'Bearer', expiresIn: 3600 });
   } catch (err) {
-    console.error('[LOGIN]', err.message);
+    logger.error(`[LOGIN] ${err.message}`);
     return res.status(500).json({ status: 500, error: 'Internal Server Error', message: 'Error al procesar login' });
   }
 });
@@ -251,12 +263,12 @@ app.post('/auth/recover-password', async (req, res) => {
         event: 'usuario.recuperacion',
         data: { email, token: resetToken },
       });
-      console.log(`[RECOVER] Token de recuperación generado para: ${email}`);
+      logger.info(`[RECOVER] Token de recuperación generado para: ${email}`);
     }
 
     return res.json({ message: 'Si el email está registrado, recibirá instrucciones para restablecer su contraseña' });
   } catch (err) {
-    console.error('[RECOVER]', err.message);
+    logger.error(`[RECOVER] ${err.message}`);
     return res.status(500).json({ status: 500, error: 'Internal Server Error', message: 'Error al procesar solicitud' });
   }
 });
@@ -324,10 +336,10 @@ app.post('/auth/reset-password', async (req, res) => {
       return res.status(404).json({ status: 404, error: 'Not Found', message: 'Usuario no encontrado' });
     }
 
-    console.log(`[RESET] Contraseña actualizada para: ${email}`);
+    logger.info(`[RESET] Contraseña actualizada para: ${email}`);
     return res.json({ message: 'Contraseña actualizada exitosamente. Ya puede hacer login.' });
   } catch (err) {
-    console.error('[RESET]', err.message);
+    logger.error(`[RESET] ${err.message}`);
     return res.status(500).json({ status: 500, error: 'Internal Server Error', message: 'Error al restablecer contraseña' });
   }
 });
@@ -339,9 +351,9 @@ app.use((req, res) => {
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 setEventHandler(handleEmployeeEvent);
-connectRabbit().catch(err => console.error('[RabbitMQ] Error al iniciar:', err.message));
+connectRabbit().catch(err => logger.error(`[RabbitMQ] Error al iniciar: ${err.message}`));
 
 app.listen(PORT, () => {
-  console.log(`[auth-service] Listo en http://localhost:${PORT}`);
-  console.log(`[auth-service] Swagger UI: http://localhost:${PORT}/docs`);
+  logger.info(`[auth-service] Listo en http://localhost:${PORT}`);
+  logger.info(`[auth-service] Swagger UI: http://localhost:${PORT}/docs`);
 });
